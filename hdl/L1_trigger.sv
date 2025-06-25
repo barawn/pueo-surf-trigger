@@ -2,7 +2,6 @@
 `include "interfaces.vh"
 `include "L1Beams_header.vh"
 
-`define USING_DEBUG 0
 `define DLYFF #0.1
 // Pre-trigger filter chain.
 // 1) Shannon-Whitaker low pass filter
