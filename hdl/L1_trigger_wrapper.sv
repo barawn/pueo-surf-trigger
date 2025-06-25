@@ -1,5 +1,6 @@
 `timescale 1ns / 1ps
 `include "interfaces.vh"
+`include "debug_enable.vh"
 
 `define DLYFF #0.1
 `define STARTTHRESH 18'd3500
