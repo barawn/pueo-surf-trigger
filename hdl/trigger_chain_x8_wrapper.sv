@@ -5,7 +5,9 @@
 `define ADDR_MATCH( addr, val, mask ) ( ( addr & mask ) == (val & mask) )
 
 // 8 channels of trigger chain, with wisbone interconnect
-module trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS = 2)(  
+module trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
+                                  parameter CLKTYPE = "NONE",
+                                  parameter WBCLKTYPE = "NONE")(  
 
         input wb_clk_i,
         input wb_rst_i,
@@ -130,7 +132,8 @@ module trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS = 2)(
             assign wb_agc_connect_we_o  = wb_agc_we_i;
             assign wb_agc_connect_sel_o = wb_agc_sel_i;
 
-            trigger_chain_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS))
+            trigger_chain_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
+                                    .WBCLKTYPE(WBCLKTYPE),.CLKTYPE(CLKTYPE))
             u_chain(
                 .wb_clk_i(wb_clk_i),
                 .wb_rst_i(wb_rst_i),

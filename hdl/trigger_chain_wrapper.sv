@@ -419,7 +419,8 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
 
     // Biquads
 
-    biquad8_x2_wrapper u_biquadx2(
+    biquad8_x2_wrapper #(.WBCLKTYPE(WBCLKTYPE),
+                         .CLKTYPE(CLKTYPE)) u_biquadx2(
         .wb_clk_i(wb_clk_i),
         .wb_rst_i(wb_rst_i),        
         `CONNECT_WBS_IFS( wb_ , wb_bq_ ),
@@ -432,7 +433,9 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
     assign dat_debug[0] = data_stage_connection[0];
     assign dat_debug[1] = data_stage_connection[2];
 
-    agc_wrapper #(.TIMESCALE_REDUCTION((2**AGC_TIMESCALE_REDUCTION_BITS)))
+    agc_wrapper #(.TIMESCALE_REDUCTION((2**AGC_TIMESCALE_REDUCTION_BITS)),
+                  .WBCLKTYPE(WBCLKTYPE),
+                  .CLKTYPE(CLKTYPE))
      u_agc_wrapper(
         .wb_clk_i(wb_clk_i),
         .wb_rst_i(wb_rst_i),        

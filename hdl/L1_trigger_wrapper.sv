@@ -1,7 +1,7 @@
 `timescale 1ns / 1ps
 `include "interfaces.vh"
 
-`define USING_DEBUG 1
+`define USING_DEBUG 0
 `define DLYFF #0.1
 `define STARTTHRESH 18'd3500
 
@@ -345,6 +345,8 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
 
 
     L1_trigger #(   .AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS), 
+                    .WBCLKTYPE(WBCLKTYPE),
+                    .CLKTYPE(CLKTYPE),
                     .TRIGGER_CLOCKS(TRIGGER_CLOCKS),
                     .NBEAMS(NBEAMS))
         u_L1_trigger(

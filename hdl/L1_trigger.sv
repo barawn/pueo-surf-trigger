@@ -2,7 +2,7 @@
 `include "interfaces.vh"
 `include "L1Beams_header.vh"
 
-`define USING_DEBUG 1
+`define USING_DEBUG 0
 `define DLYFF #0.1
 // Pre-trigger filter chain.
 // 1) Shannon-Whitaker low pass filter
@@ -262,7 +262,8 @@ module L1_trigger #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTION_BITS =
     assign dat_debug = data_stage_debug;
     `endif
 
-    trigger_chain_x8_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS))
+    trigger_chain_x8_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
+                               .WBCLKTYPE(WBCLKTYPE),.CLKTYPE(CLKTYPE))
                 u_chain(
                     .wb_clk_i(wb_clk_i),
                     .wb_rst_i(wb_rst_i),
