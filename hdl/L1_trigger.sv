@@ -9,6 +9,7 @@
 // 2) Two Biquads in serial (to be used as notches)
 // 3) AGC and 12->5 bit conversion
 module L1_trigger #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
+                    parameter USE_BIQUADS = "FALSE",
                     parameter WBCLKTYPE = "PSCLK", parameter CLKTYPE = "ACLK",
                     parameter [47:0] TRIGGER_CLOCKS=375000000,
                     parameter HOLDOFF_CLOCKS=16)( // at 375 MHz this will count for 1 s  
@@ -263,6 +264,7 @@ module L1_trigger #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTION_BITS =
     `endif
 
     trigger_chain_x8_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
+                               .USE_BIQUADS(USE_BIQUADS),
                                .WBCLKTYPE(WBCLKTYPE),.CLKTYPE(CLKTYPE))
                 u_chain(
                     .wb_clk_i(wb_clk_i),
