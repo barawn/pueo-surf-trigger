@@ -404,13 +404,13 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
         endcase
     end
 
-    reg [95:0] data_stage_connection [3:0]; // In 12 bits since that's what the LPF works in
+    reg [95:0] data_stage_connection [5:0]; // In 12 bits since that's what the LPF works in
 
-    // Pipeline the connections
     always @(posedge aclk) begin
-        data_stage_connection[1] <= data_stage_connection[0]; // LPF out to Biquad in
-        data_stage_connection[3] <= data_stage_connection[2]; // Biquad out to AGC in
-    end
+        data_stage_connection[1] <= data_stage_connection[0]; // LPF to Matched Filter
+        data_stage_connection[3] <= data_stage_connection[2]; // Matched Filter to Biquad
+        data_stage_connection[5] <= data_stage_connection[4]; // Biquad out to AGC in
+    end 
 
 
     // Debug lines
@@ -422,6 +422,13 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                                         .in_i(dat_i),
                                         .out_o(data_stage_connection[0]));
 
+    // Matched Filter
+    matched_filter u_matched_filter(
+        .aclk(aclk),
+        .data_i(data_stage_connection[1]),
+        .data_o(data_stage_connection[2])
+    );
+
     // Biquads
     generate
         if (USE_BIQUADS == "TRUE") begin : BQ2
@@ -432,26 +439,19 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                 `CONNECT_WBS_IFS( wb_ , wb_bq_ ),
                 .reset_BQ_i(reset_i),
                 .aclk(aclk),
-                .dat_i(data_stage_connection[1]),
-                .dat_o(data_stage_connection[2])
+                .dat_i(data_stage_connection[3]),
+                .dat_o(data_stage_connection[4])
             );
         end else begin : BYP
-            wbs_dummy #(.ADDRESS_BITS(8),.DATA_BITS(32))
+            wbs_dummy #(.ADDRESS_WIDTH(8),.DATA_WIDTH(32))
                 u_bq(`CONNECT_WBS_IFS( wb_ , wb_bq_ ));
             // TODO replace this with the delay that you would normally
             // get from a biquad with unity gain
-            assign data_stage_connection[2] = data_stage_connection[1];
+            assign data_stage_connection[3] = data_stage_connection[4];
         end
     endgenerate        
 
-    `ifdef USING_DEBUG
-        assign dat_debug[0] = data_stage_connection[0];
-        assign dat_debug[1] = data_stage_connection[2];
-    `endif
-
-    agc_wrapper #(.TIMESCALE_REDUCTION((2**AGC_TIMESCALE_REDUCTION_BITS)),
-                  .WBCLKTYPE(WBCLKTYPE),
-                  .CLKTYPE(CLKTYPE))
+    agc_wrapper #(.TIMESCALE_REDUCTION((2**AGC_TIMESCALE_REDUCTION_BITS)))
      u_agc_wrapper(
         .wb_clk_i(wb_clk_i),
         .wb_rst_i(wb_rst_i),        
