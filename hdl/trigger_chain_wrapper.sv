@@ -432,7 +432,7 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                 .dat_o(data_stage_connection[2])
             );
         end else begin : BYP
-            wbs_dummy #(.ADDRESS_BITS(8),.DATA_BITS(32))
+            wbs_dummy #(.ADDRESS_WIDTH(8),.DATA_WIDTH(32))
                 u_bq(`CONNECT_WBS_IFS( wb_ , wb_bq_ ));
             // TODO replace this with the delay that you would normally
             // get from a biquad with unity gain
