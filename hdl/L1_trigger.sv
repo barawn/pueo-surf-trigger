@@ -2,12 +2,14 @@
 `include "interfaces.vh"
 `include "L1Beams_header.vh"
 
+`define USING_DEBUG 0
 `define DLYFF #0.1
 // Pre-trigger filter chain.
 // 1) Shannon-Whitaker low pass filter
 // 2) Two Biquads in serial (to be used as notches)
 // 3) AGC and 12->5 bit conversion
 module L1_trigger #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
+                    parameter USE_BIQUADS = "FALSE",
                     parameter WBCLKTYPE = "PSCLK", parameter CLKTYPE = "ACLK",
                     parameter [47:0] TRIGGER_CLOCKS=375000000,
                     parameter HOLDOFF_CLOCKS=16)( // at 375 MHz this will count for 1 s  
@@ -262,6 +264,7 @@ module L1_trigger #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTION_BITS =
     `endif
 
     trigger_chain_x8_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
+                               .USE_BIQUADS(USE_BIQUADS),
                                .WBCLKTYPE(WBCLKTYPE),.CLKTYPE(CLKTYPE))
                 u_chain(
                     .wb_clk_i(wb_clk_i),
@@ -284,7 +287,9 @@ module L1_trigger #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTION_BITS =
         end
     endgenerate
 
-    beamform_trigger #(.NBEAMS(NBEAMS)) 
+    beamform_trigger #(.NBEAMS(NBEAMS),
+                       .WBCLKTYPE(WBCLKTYPE),
+                       .CLKTYPE(CLKTYPE)) 
         u_trigger(
             .clk_i(aclk),
             .data_i(data_stage_connection),

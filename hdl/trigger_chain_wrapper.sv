@@ -10,6 +10,7 @@
 // 2) Two Biquads in serial (to be used as notches)
 // 3) AGC and 12->5 bit conversion
 module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
+                                parameter USE_BIQUADS = "FALSE",
                                 parameter TARGET_RMS_SQUARED = 16,
                                 parameter RMS_SQUARE_SCALE_ERR = 0,
                                 parameter OFFSET_ERR = 5,
@@ -418,18 +419,26 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                                         .out_o(data_stage_connection[0]));
 
     // Biquads
-
-    biquad8_x2_wrapper #(.WBCLKTYPE(WBCLKTYPE),
-                         .CLKTYPE(CLKTYPE)) u_biquadx2(
-        .wb_clk_i(wb_clk_i),
-        .wb_rst_i(wb_rst_i),        
-        `CONNECT_WBS_IFS( wb_ , wb_bq_ ),
-        .reset_BQ_i(reset_i),
-        .aclk(aclk),
-        .dat_i(data_stage_connection[1]),
-        .dat_o(data_stage_connection[2])
-    );
-
+    generate
+        if (USE_BIQUADS == "TRUE") begin : BQ2
+            biquad8_x2_wrapper #(.WBCLKTYPE(WBCLKTYPE),
+                                 .CLKTYPE(CLKTYPE)) u_biquadx2(
+                .wb_clk_i(wb_clk_i),
+                .wb_rst_i(wb_rst_i),        
+                `CONNECT_WBS_IFS( wb_ , wb_bq_ ),
+                .reset_BQ_i(reset_i),
+                .aclk(aclk),
+                .dat_i(data_stage_connection[1]),
+                .dat_o(data_stage_connection[2])
+            );
+        end else begin : BYP
+            wbs_dummy #(.ADDRESS_WIDTH(8),.DATA_WIDTH(32))
+                u_bq(`CONNECT_WBS_IFS( wb_ , wb_bq_ ));
+            // TODO replace this with the delay that you would normally
+            // get from a biquad with unity gain
+            assign data_stage_connection[2] = data_stage_connection[1];
+        end
+    endgenerate        
 
     `ifdef USING_DEBUG
         assign dat_debug[0] = data_stage_connection[0];

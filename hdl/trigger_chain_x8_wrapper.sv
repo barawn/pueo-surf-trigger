@@ -6,6 +6,7 @@
 
 // 8 channels of trigger chain, with wisbone interconnect
 module trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
+                                  parameter USE_BIQUADS = "FALSE",
                                   parameter CLKTYPE = "NONE",
                                   parameter WBCLKTYPE = "NONE")(  
 
@@ -133,6 +134,7 @@ module trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
             assign wb_agc_connect_sel_o = wb_agc_sel_i;
 
             trigger_chain_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
+                                    .USE_BIQUADS(USE_BIQUADS),
                                     .WBCLKTYPE(WBCLKTYPE),.CLKTYPE(CLKTYPE))
             u_chain(
                 .wb_clk_i(wb_clk_i),
