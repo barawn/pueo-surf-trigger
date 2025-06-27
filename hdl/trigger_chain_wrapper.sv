@@ -195,8 +195,8 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
         
         // If reading, load the response in
         if (state == READ) begin
-            // If bit [4] is 1, return from control loop info
-            // Else, bit [4] is 0, return from AGC module info
+            // If bit [6] is 1, return from control loop info
+            // Else, bit [6] is 0, return from AGC module info
             if(wb_agc_controller_adr_i[6]) begin 
                 case (wb_agc_controller_adr_i[5:2])
                     0: response_reg <= {{(32-17){1'b0}}, agc_control_scale_delta};

@@ -3,7 +3,7 @@
 `include "debug_enable.vh"
 
 `define DLYFF #0.1
-`define STARTTHRESH 18'd3500
+`define STARTTHRESH 18'd4500
 
 module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
                     parameter WBCLKTYPE = "PSCLK", parameter CLKTYPE = "ACLK",

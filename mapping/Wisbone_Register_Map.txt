@@ -1,0 +1,44 @@
+Wishbone Address Space For L1 Trigger
+
+15 bit space (0x0000-0x7FFF)
+
+0x0000 - 0x1FFF : L1 Trigger Wrapper
+   0x0000 - 0x03FF:  Read the trigger threshold adjustment
+                     delta per cycle.
+   0x0400 - 0x07FF:  Read number of triggers from 
+                     last cycle. Bits [9:2] (0x3FC) are the
+                     beam number.
+   0x0800 - 0x0FFF:  Read the threshold set last trigger cycle.
+                     Bits [9:2] (0x3FC) are the beam number.
+   0x1000 - 0x3FFF:  UNUSED
+0x4000 - 0x7FFF : AGC/Biquads
+   0x4000 - 0x5FFF : AGC
+      Channel index mask is 0x1C00 (bits [12:10])
+         0x4000 - 0x4014 : Read Only AGC Data
+            0x4000 : AGC done bit.
+            0x4004 : Square accumulator.
+            0x4008 : Greater-than accumulator.
+            0x400C : Less-than accumulator.
+            0x4010 : AGC scale.
+            0x4014 : AGC offset.
+         0x4018 - 0x403F : UNUSED
+         0x4040 - 0x4044 : Read AGC Servo Data.
+            0x4040 : AGC scale adjustment delta per cycle.
+            0x4044 : AGC offset adjustment delta per cycle.
+   0x6000 - 0x7FFF : Biquads
+      Channel index mask is 0x1C00 (bits [12:10])
+         Biquad (0/1) selection mask is 0x800 (bit [7])
+            0x6000 : control (individual biquad update, bypass control).
+            0x6004 : coefficients for the single zero FIR (A, B ) programmed in 
+                     a cascade (write B to 0x04, then write A to 0x04).
+            0x6008 : coefficients for the pole IIR (C0, C1, C3, C2), programmed 
+                     in a cascade (write C2, then C3, then C1, then C0).
+                     NOTE UNUSUAL COEFFICIENT ORDER - THIS IS CORRECT
+            0x600C : coefficients for the incremental computation a'_2, a'_1, 
+                     programmed in a cascade (write a'_1 then a'_2).
+            0x6010 : coefficients for the f FIR (X1 . . . X6) and the f component of the
+                     F fir (DFF), programmed in cascade (program DFF, then X6 down to X1).
+            0x6014 : coefficients for the g FIR (X1 . . . X7) and the g component of the
+                     G fir (EGG), programmed in cascade (program EGG, then X7down to X1).
+            0x6018 : coefficient of g in the F FIR (DF G).
+                     0x601C : coefficient of f in the G FIR (EGF ).
