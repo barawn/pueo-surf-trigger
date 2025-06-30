@@ -436,35 +436,24 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                 `CONNECT_WBS_IFS( wb_ , wb_bq_ ),
                 .reset_BQ_i(reset_i),
                 .aclk(aclk),
-                .dat_i(data_stage_connection[1]),
-                .dat_o(data_stage_connection[2])
+                .dat_i(data_stage_connection[3]),
+                .dat_o(data_stage_connection[4])
             );
         end else begin : BYP
             wbs_dummy #(.ADDRESS_WIDTH(8),.DATA_WIDTH(32))
                 u_bq(`CONNECT_WBS_IFS( wb_ , wb_bq_ ));
             // TODO replace this with the delay that you would normally
             // get from a biquad with unity gain
-            assign data_stage_connection[2] = data_stage_connection[1];
+            assign data_stage_connection[4] = data_stage_connection[3];
         end
     endgenerate        
 
-
-
-    biquad8_x2_wrapper u_biquadx2(
-        .wb_clk_i(wb_clk_i),
-        .wb_rst_i(wb_rst_i),        
-        `CONNECT_WBS_IFS( wb_ , wb_bq_ ),
-        .reset_BQ_i(reset_i),
-        .aclk(aclk),
-        .dat_i(data_stage_connection[3]),
-        .dat_o(data_stage_connection[4])
-    );
-
-    assign dat_debug[0] = data_stage_connection[0];
-    assign dat_debug[1] = data_stage_connection[2];
+    `ifdef USING_DEBUG
+        assign dat_debug[0] = data_stage_connection[0];
+        assign dat_debug[1] = data_stage_connection[2];
+    `endif
 
     agc_wrapper #(.TIMESCALE_REDUCTION((2**AGC_TIMESCALE_REDUCTION_BITS)))
-
      u_agc_wrapper(
         .wb_clk_i(wb_clk_i),
         .wb_rst_i(wb_rst_i),        
