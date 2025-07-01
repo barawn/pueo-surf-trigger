@@ -10,7 +10,11 @@ Wishbone Address Space For L1 Trigger
                      beam number.
    0x0800 - 0x0FFF:  Read the threshold set last trigger cycle.
                      Bits [9:2] (0x3FC) are the beam number.
-   0x1000 - 0x3FFF:  UNUSED
+            0x1000:  Write control value to L1 trigger controller.
+                     Value 0: Reset loop.
+                     
+   0x1001 - 0x3FFF:  UNUSED
+
 0x4000 - 0x7FFF : AGC/Biquads
    0x4000 - 0x5FFF : AGC
       Channel index mask is 0x1C00 (bits [12:10])
