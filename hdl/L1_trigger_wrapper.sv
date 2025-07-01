@@ -150,8 +150,8 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
     localparam LOOP_STATE_BITS = 3;
     localparam [FSM_BITS-1:0] RUNNING       = 0;
     localparam [FSM_BITS-1:0] RESETTING     = 1;
-    localparam [FSM_BITS-1:0] WRITE_RESET   = 1;
-    localparam [FSM_BITS-1:0] STOPPED       = 2;
+    localparam [FSM_BITS-1:0] WRITE_RESET   = 2;
+    localparam [FSM_BITS-1:0] STOPPED       = 3;
 
     reg [FSM_BITS-1:0] loop_state = RUNNING;   
     reg [FSM_BITS-1:0] loop_state_request = RUNNING;   
@@ -181,6 +181,9 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
             WAIT: begin // Wait for the control loop to implement the write command
                 if(loop_state == loop_state_request) begin
                     state <= ACK;
+                    if(loop_state == RESETTING) begin
+                        loop_state_request <= RUNNING;
+                    end
                 end
             end 
             READ: state <= ACK;
@@ -198,7 +201,7 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
             else response_reg <= {{(32-NBITS_KP){1'b0}}, trigger_control_delta};
         end
         if (state == WRITE) begin
-            if(ADDR_MATCH(wb_adr_i[13:0], 14'h1000, 14'h3FFF)) begin: WRITE_COMMANDS
+            if(`ADDR_MATCH(wb_adr_i[13:0], 14'h1000, 14'h3FFF)) begin: WRITE_COMMANDS
                 if(wb_dat_i == 32'h00000000) begin: SEND_TO_RESET
                     loop_state_request <= RESETTING;
                 end
@@ -263,7 +266,7 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
             THRESHOLD_WAITING: begin // Wait for count cycle to finish 1
                 if(comm_FSM_state == COMM_SENDING) begin
                     if(loop_state_request == RESETTING) begin
-                        comm_FSM_state <= THRESHOLD_RESETTING;
+                        threshold_FSM_state <= THRESHOLD_RESETTING;
                     end else begin
                         do_read_req_trigger(22'h0);
                         comm_FSM_state <= COMM_WAITING;
@@ -372,7 +375,8 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
             end
             THRESHOLD_RESETTING: begin // Reset all thresholds 7
                 threshold_recalculated_regs <= {NBEAMS{`STARTTHRESH}};
-                comm_FSM_state <= THRESHOLD_WRITING;
+                threshold_FSM_state <= THRESHOLD_WRITING;
+                comm_FSM_state <= COMM_SENDING;
                 loop_state <= WRITE_RESET;
                 beam_idx <= 0;
             end
