@@ -167,14 +167,31 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
 
     reg threshold_write_flag = 0;  
 
-    // always @(posedge)
+    // Downstream State machine control
+    localparam THRESHOLD_FSM_BITS = 4;
+    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_POLLING = 0;
+    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_WAITING = 1;
+    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_READING = 2;
+    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_CALCULATING = 3;
+    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_WRITING = 4;
+    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_APPLYING = 5;
+    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_UPDATING = 6;
+    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_RESETTING = 7;
+    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_BOOT_DELAY = 8;
+
+    localparam COMM_FSM_BITS = 2;
+    localparam [COMM_FSM_BITS-1:0] COMM_SENDING = 0;
+    localparam [COMM_FSM_BITS-1:0] COMM_WAITING = 1;
+    localparam [COMM_FSM_BITS-1:0] COMM_PROCESSING = 2;
+
+    reg [THRESHOLD_FSM_BITS-1:0] threshold_FSM_state = THRESHOLD_BOOT_DELAY;  
+    reg [THRESHOLD_FSM_BITS-1:0] comm_FSM_state = COMM_SENDING;  
+    reg [$clog2(NBEAMS)+1:0] beam_idx = 0; // Control what beam we are looking at
+    reg [4:0] boot_delay_count = 5'b11111;
 
 
-    //////////////////////////////////////////////////////////
-    //////        Wishbone FSM For Upstream Comms       //////
-    //////////////////////////////////////////////////////////
     always @(posedge wb_clk_i) begin
-        if( wb_rst_i) begin // Reset everything
+        if (wb_rst_i) begin // Reset everything
             state <= IDLE;
             loop_state <= RUNNING;
             loop_state_request <= RUNNING;
@@ -184,7 +201,21 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
             trigger_count_reg <= {(NBEAMS*32){1'b0}};
             threshold_recalculated_regs <= {NBEAMS{`STARTTHRESH}};
             threshold_regs <= {NBEAMS{`STARTTHRESH}};
+            trigger_response <= 32'h0;
+            threshold_FSM_state <= THRESHOLD_BOOT_DELAY;
+            comm_FSM_state <= COMM_SENDING;
+            beam_idx <= 0;
+            boot_delay_count <= 5'b11111;
+        end else if(threshold_write_flag && comm_FSM_state != COMM_WAITING) begin 
+            // Move to writing the manually updated thresholds
+            threshold_write_flag <= 0;
+            threshold_FSM_state <= THRESHOLD_WRITING;
+            comm_FSM_state <= COMM_SENDING;
+            beam_idx <= 0;
         end else begin
+            //////////////////////////////////////////////////////////
+            //////        Wishbone FSM For Upstream Comms       //////
+            //////////////////////////////////////////////////////////
             // Determine what we are doing this cycle
             case (state)
                 IDLE: if (wb_control_loop_cyc_i && wb_stb_i) begin
@@ -237,52 +268,10 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
             if (state == WAIT) begin
                 // Do nothing but wait for control loop state to sync up
             end
-        end
-    end
-
-
-
-    // Downstream State machine control
-    localparam THRESHOLD_FSM_BITS = 4;
-    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_POLLING = 0;
-    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_WAITING = 1;
-    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_READING = 2;
-    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_CALCULATING = 3;
-    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_WRITING = 4;
-    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_APPLYING = 5;
-    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_UPDATING = 6;
-    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_RESETTING = 7;
-    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_BOOT_DELAY = 8;
-
-    localparam COMM_FSM_BITS = 2;
-    localparam [COMM_FSM_BITS-1:0] COMM_SENDING = 0;
-    localparam [COMM_FSM_BITS-1:0] COMM_WAITING = 1;
-    localparam [COMM_FSM_BITS-1:0] COMM_PROCESSING = 2;
-
-    reg [THRESHOLD_FSM_BITS-1:0] threshold_FSM_state = THRESHOLD_BOOT_DELAY;  
-    reg [THRESHOLD_FSM_BITS-1:0] comm_FSM_state = COMM_SENDING;  
-    reg [$clog2(NBEAMS)+1:0] beam_idx = 0; // Control what beam we are looking at
-    reg [4:0] boot_delay_count = 5'b11111;
-
-    // wire [NBEAMS][31:0] threshold_recalculated_wire_out;
     
-    /////////////////////////////////////////////////////////////////
-    //////       Control Loop FSM For Downstream Control       //////
-    /////////////////////////////////////////////////////////////////
-    always @(posedge wb_clk_i) begin
-        if (wb_rst_i) begin
-            trigger_response <= 32'h0;
-            threshold_FSM_state <= THRESHOLD_BOOT_DELAY;
-            comm_FSM_state <= COMM_SENDING;
-            beam_idx <= 0;
-            boot_delay_count <= 5'b11111;
-        end else if(threshold_write_flag && comm_FSM_state != COMM_WAITING) begin 
-            // Move to writing the manually updated thresholds
-            threshold_write_flag <= 0;
-            threshold_FSM_state <= THRESHOLD_WRITING;
-            comm_FSM_state <= COMM_SENDING;
-            beam_idx <= 0;
-        end else begin
+            /////////////////////////////////////////////////////////////////
+            //////       Control Loop FSM For Downstream Control       //////
+            /////////////////////////////////////////////////////////////////
             if(loop_state_request == RUNNING) begin
                 loop_state <= RUNNING;
             end else if(loop_state_request == STOPPED) begin
