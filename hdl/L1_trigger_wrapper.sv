@@ -204,6 +204,10 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
             if(`ADDR_MATCH(wb_adr_i[13:0], 14'h1000, 14'h3FFF)) begin: WRITE_COMMANDS
                 if(wb_dat_i == 32'h00000000) begin: SEND_TO_RESET
                     loop_state_request <= RESETTING;
+                end else if(wb_dat_i == 32'h00000001) begin: SEND_TO_RUNNING
+                    loop_state_request <= RUNNING;
+                end else if(wb_dat_i == 32'h00000002) begin: SEND_TO_PAUSE
+                    loop_state_request <= STOPPED;
                 end
             end     
         end
@@ -230,9 +234,6 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
     localparam [COMM_FSM_BITS-1:0] COMM_SENDING = 0;
     localparam [COMM_FSM_BITS-1:0] COMM_WAITING = 1;
     localparam [COMM_FSM_BITS-1:0] COMM_PROCESSING = 2;
-    // localparam [COMM_FSM_BITS-1:0] THRESHOLD_READING = 2;
-    // localparam [COMM_FSM_BITS-1:0] THRESHOLD_CALCULATING = 3;
-    // localparam [COMM_FSM_BITS-1:0] THRESHOLD_WRITING = 4;
 
     reg [THRESHOLD_FSM_BITS-1:0] threshold_FSM_state = THRESHOLD_BOOT_DELAY;  
     reg [THRESHOLD_FSM_BITS-1:0] comm_FSM_state = COMM_SENDING;  
@@ -246,6 +247,12 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
     /////////////////////////////////////////////////////////////////
     always @(posedge wb_clk_i) begin
         
+        if(loop_state_request == RUNNING) begin
+            loop_state <= RUNNING;
+        end else if(loop_state_request == STOPPED) begin
+            loop_state <= STOPPED;
+        end
+
         // Determine what we are doing this cycle
         case (threshold_FSM_state)
             THRESHOLD_POLLING: begin // Start a trigger count cycle 0
@@ -307,7 +314,10 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
                 end
             end
             THRESHOLD_CALCULATING: begin // Calculate the threshold updates from the recent trigger counts 3
-                if(beam_idx < NBEAMS) begin
+                if(loop_state == STOPPED) begin // If stopped, skip the rest of the state machine and start again
+                    comm_FSM_state <= COMM_SENDING;
+                    threshold_FSM_state <= THRESHOLD_POLLING; 
+                end else if(beam_idx < NBEAMS) begin
                     // Will figure out multiplication in the future
                     // For now just simply raise or lower by set amount
                     if(trigger_count_reg[beam_idx] > (trigger_target_wb_reg + COUNT_MARGIN)) begin
