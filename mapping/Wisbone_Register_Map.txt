@@ -12,6 +12,8 @@ Wishbone Address Space For L1 Trigger
                      Bits [9:2] (0x3FC) are the beam number.
             0x1000:  Write control value to L1 trigger controller.
                      Value 0: Reset loop.
+                     Value 1: Start loop updating thresholds.
+                     Value 2: Stop loop from updating thresholds.
                      
    0x1001 - 0x3FFF:  UNUSED
 
