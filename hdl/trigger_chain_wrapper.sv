@@ -453,7 +453,9 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
         assign dat_debug[1] = data_stage_connection[2];
     `endif
 
-    agc_wrapper #(.TIMESCALE_REDUCTION((2**AGC_TIMESCALE_REDUCTION_BITS)))
+    agc_wrapper #(.TIMESCALE_REDUCTION((2**AGC_TIMESCALE_REDUCTION_BITS)),
+                  .WBCLKTYPE(WBCLKTYPE),
+                  .CLKTYPE(CLKTYPE))
      u_agc_wrapper(
         .wb_clk_i(wb_clk_i),
         .wb_rst_i(wb_rst_i),        
