@@ -75,8 +75,10 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
 
     // Pass commands not about trigger rate control loop down
     `DEFINE_WB_IF( wb_L1_submodule_ , 22, 32);
-    
     `DEFINE_WB_IF( wb_threshold_ , 22, 32);
+
+    reg soft_reset = 0;
+    reg agc_reset = 0;
     
     (* CUSTOM_CC_DST = WBCLKTYPE *)
     reg [21:0] address_threshold = {22{1'b0}};
@@ -212,7 +214,31 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
             boot_delay_count <= 5'b11111;
             threshold_write_flag <= 0;
             threshold_write_flag_done <= 0;
+            soft_reset <= 0;
+            agc_reset <= 0;
+        end else if (soft_reset) begin // Reset everything, send to ACK
+            state <= ACK;
+            loop_state <= RUNNING;
+            loop_state_request <= RUNNING;
+            response_reg <= 32'h0;
+            trigger_target_wb_reg <= STARTING_TARGET;
+            trigger_control_delta <= STARTING_DELTA;
+            trigger_count_reg <= {(NBEAMS*32){1'b0}};
+            threshold_recalculated_regs <= {NBEAMS{`STARTTHRESH}};
+            threshold_regs <= {NBEAMS{`STARTTHRESH}};
+            trigger_response <= 32'h0;
+            threshold_FSM_state <= THRESHOLD_BOOT_DELAY;
+            comm_FSM_state <= COMM_SENDING;
+            beam_idx <= 0;
+            boot_delay_count <= 5'b11111;
+            threshold_write_flag <= 0;
+            threshold_write_flag_done <= 0;
+            soft_reset <= 0;
+            agc_reset <= 0;
         end else begin
+
+            if(agc_reset) agc_reset <= 0;
+
             //////////////////////////////////////////////////////////
             //////        Wishbone FSM For Upstream Comms       //////
             //////////////////////////////////////////////////////////
@@ -255,6 +281,9 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
                     end else if(wb_dat_i == 32'h00000002) begin: SEND_TO_PAUSE
                         loop_state_request <= STOPPED;
                     end
+                end else if (`ADDR_MATCH(wb_adr_i[13:0], 14'h1001, 14'h3FFF)) begin: REQ_SOFT_RESET
+                    if(wb_dat_i[0]) soft_reset <= 1;
+                    if(wb_dat_i[1]) agc_reset  <= 1;
                 end else if (`ADDR_MATCH(wb_adr_i[13:0], 14'h0800, 14'h3800)) begin: MANUAL_THRESHOLD_WRITE // Manually write a threshold
                     if(loop_state == STOPPED && loop_state_request != WRITE_MANUAL_DONE) begin
                         // Write in new threshold
@@ -451,6 +480,7 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
             `CONNECT_WBS_IFM( wb_ , wb_L1_submodule_ ),
             `CONNECT_WBS_IFM( wb_threshold_ , wb_threshold_ ),
             .reset_i(reset_i), 
+            .agc_reset_i(agc_reset),
             .aclk(aclk),
             .dat_i(dat_i),
             
