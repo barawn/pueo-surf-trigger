@@ -29,6 +29,7 @@ module L1_trigger #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTION_BITS =
         
         // Control to capture the output to the RAM buffer
         input reset_i, 
+        input agc_reset_i,
         input aclk,
         input [7:0][95:0] dat_i,
 
@@ -274,6 +275,7 @@ module L1_trigger #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTION_BITS =
                     `CONNECT_WBS_IFM( wb_bq_ , bq_submodule_ ),//L
                     `CONNECT_WBS_IFM( wb_agc_ , agc_submodule_ ),
                     .reset_i(reset_i), 
+                    .agc_reset_i(agc_reset_i),
                     .aclk(aclk),
                     .dat_i(dat_i),
                     `ifdef USING_DEBUG

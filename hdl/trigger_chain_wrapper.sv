@@ -31,6 +31,7 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
         
         // Control to capture the output to the RAM buffer
         input reset_i, 
+        input agc_reset_i,
         input aclk,
         input [95:0] dat_i,
         
@@ -254,7 +255,7 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
     //////       Control Loop FSM For Downstream Control       //////
     /////////////////////////////////////////////////////////////////
     always @(posedge wb_clk_i) begin
-        if (wb_rst_i) begin
+        if (wb_rst_i || agc_reset_i) begin
             agc_module_FSM_state <= AGC_MODULE_BOOT_DELAY;
             comm_FSM_state <= COMM_SENDING;
             agc_module_info_idx <= 0;
