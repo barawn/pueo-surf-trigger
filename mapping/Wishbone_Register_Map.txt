@@ -20,7 +20,7 @@ Wishbone Address Space For L1 Trigger
             0x1001:  Write reset flag, value chooses what gets reset.
                      Value 0: No Effect
                      Value 1: Reset just the threshold control loop
-                     Value 2: Reset just the AGCS (all channels)
+                     Value 2: Reset just the AGCs (all channels)
                      Value 3: Reset both threshold control loop and AGCs
    0x1002 - 0x1FFF:  UNUSED
    0x2000 - 0x3FFF:  UNUSED (may shadow some reads)
