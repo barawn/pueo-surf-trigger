@@ -8,8 +8,11 @@ Wishbone Address Space For L1 Trigger
    0x0400 - 0x07FF:  Read number of triggers from 
                      last cycle. Bits [9:2] (0x3FC) are the
                      beam number.
-   0x0800 - 0x0FFF:  Read the threshold set last trigger cycle.
+   0x0800 - 0x0FFF:  Read/Write the threshold.
                      Bits [9:2] (0x3FC) are the beam number.
+                     Control loop MUST BE STOPPED during a write.
+                     Reports 1 on a successful write, 0 if loop 
+                     was running.
             0x1000:  Write control value to L1 trigger controller.
                      Value 0: Reset loop.
                      Value 1: Start loop updating thresholds.
