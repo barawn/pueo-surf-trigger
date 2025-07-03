@@ -163,9 +163,7 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
     localparam [FSM_BITS-1:0] READ  = 2;
     localparam [FSM_BITS-1:0] ACK   = 3;
     localparam [FSM_BITS-1:0] WAIT  = 4;
-    reg [FSM_BITS-1:0] state = IDLE; 
-
-    reg threshold_write_flag = 0;  
+    reg [FSM_BITS-1:0] state = IDLE;   
 
     // Downstream State machine control
     localparam THRESHOLD_FSM_BITS = 4;
@@ -254,16 +252,7 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
                     end else if(wb_dat_i == 32'h00000002) begin: SEND_TO_PAUSE
                         loop_state_request <= STOPPED;
                     end
-                end else if (`ADDR_MATCH(wb_adr_i[13:0], 14'h0800, 14'h3800)) begin: MANUAL_THRESHOLD_WRITE // Manually write a threshold
-                    if(loop_state == STOPPED && !threshold_write_flag) begin
-                        // Write in new threshold
-                        threshold_recalculated_regs[wb_adr_i[9:2]] <= wb_dat_i[17:0];
-                        threshold_write_flag = 1;
-                        response_reg <= 32'b1;
-                    end else begin
-                        response_reg <= 32'b0;
-                    end
-                end 
+                end     
             end
             if (state == WAIT) begin
                 // Do nothing but wait for control loop state to sync up
@@ -272,6 +261,7 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
             /////////////////////////////////////////////////////////////////
             //////       Control Loop FSM For Downstream Control       //////
             /////////////////////////////////////////////////////////////////
+
             if(loop_state_request == RUNNING) begin
                 loop_state <= RUNNING;
             end else if(loop_state_request == STOPPED) begin
