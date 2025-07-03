@@ -305,7 +305,7 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
                             threshold_FSM_state <= THRESHOLD_RESETTING;
                         end else if(loop_state_request == WRITE_MANUAL_DONE) begin
                             threshold_FSM_state <= THRESHOLD_MANUAL;
-                        end begin
+                        end else begin
                             do_read_req_trigger(22'h0);
                             comm_FSM_state <= COMM_WAITING;
                         end
