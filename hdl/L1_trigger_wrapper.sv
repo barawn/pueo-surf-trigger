@@ -152,6 +152,8 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
     localparam [FSM_BITS-1:0] RESETTING     = 1;
     localparam [FSM_BITS-1:0] WRITE_RESET   = 2;
     localparam [FSM_BITS-1:0] STOPPED       = 3;
+    localparam [FSM_BITS-1:0] WRITE_MANUAL  = 4;
+    localparam [FSM_BITS-1:0] WRITE_MANUAL_DONE  = 5;
 
     reg [FSM_BITS-1:0] loop_state = RUNNING;   
     reg [FSM_BITS-1:0] loop_state_request = RUNNING;   
@@ -165,6 +167,9 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
     localparam [FSM_BITS-1:0] WAIT  = 4;
     reg [FSM_BITS-1:0] state = IDLE;   
 
+    reg threshold_write_flag = 0;
+    reg threshold_write_flag_done = 0;
+
     // Downstream State machine control
     localparam THRESHOLD_FSM_BITS = 4;
     localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_POLLING = 0;
@@ -176,6 +181,7 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
     localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_UPDATING = 6;
     localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_RESETTING = 7;
     localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_BOOT_DELAY = 8;
+    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_MANUAL = 9;
 
     localparam COMM_FSM_BITS = 2;
     localparam [COMM_FSM_BITS-1:0] COMM_SENDING = 0;
@@ -204,12 +210,8 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
             comm_FSM_state <= COMM_SENDING;
             beam_idx <= 0;
             boot_delay_count <= 5'b11111;
-        end else if(threshold_write_flag && comm_FSM_state != COMM_WAITING) begin 
-            // Move to writing the manually updated thresholds
             threshold_write_flag <= 0;
-            threshold_FSM_state <= THRESHOLD_WRITING;
-            comm_FSM_state <= COMM_SENDING;
-            beam_idx <= 0;
+            threshold_write_flag_done <= 0;
         end else begin
             //////////////////////////////////////////////////////////
             //////        Wishbone FSM For Upstream Comms       //////
@@ -226,6 +228,8 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
                         state <= ACK;
                         if(loop_state == RESETTING) begin
                             loop_state_request <= RUNNING;
+                        end else if (loop_state == WRITE_MANUAL_DONE) begin
+                            loop_state_request <= STOPPED;
                         end
                     end
                 end 
@@ -242,8 +246,7 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
                 if(wb_adr_i[10]) response_reg <= trigger_count_reg[wb_adr_i[9:2]];
                 else if(wb_adr_i[11]) response_reg <= {{(32-18){1'b0}}, threshold_regs[wb_adr_i[9:2]]};
                 else response_reg <= {{(32-NBITS_KP){1'b0}}, trigger_control_delta};
-            end
-            if (state == WRITE) begin
+            end else if (state == WRITE) begin
                 if(`ADDR_MATCH(wb_adr_i[13:0], 14'h1000, 14'h3FFF)) begin: WRITE_COMMANDS
                     if(wb_dat_i == 32'h00000000) begin: SEND_TO_RESET
                         loop_state_request <= RESETTING;
@@ -252,9 +255,17 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
                     end else if(wb_dat_i == 32'h00000002) begin: SEND_TO_PAUSE
                         loop_state_request <= STOPPED;
                     end
-                end     
-            end
-            if (state == WAIT) begin
+                end else if (`ADDR_MATCH(wb_adr_i[13:0], 14'h0800, 14'h3800)) begin: MANUAL_THRESHOLD_WRITE // Manually write a threshold
+                    if(loop_state == STOPPED && loop_state_request != WRITE_MANUAL_DONE) begin
+                        // Write in new threshold
+                        threshold_recalculated_regs[wb_adr_i[9:2]] <= wb_dat_i[17:0];
+                        loop_state_request <= WRITE_MANUAL_DONE;
+                        response_reg <= 32'b1;
+                    end else begin
+                        response_reg <= 32'b0;
+                    end
+                end      
+            end else if (state == WAIT) begin
                 // Do nothing but wait for control loop state to sync up
             end
     
@@ -271,8 +282,11 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
             // Determine what we are doing this cycle
             case (threshold_FSM_state)
                 THRESHOLD_POLLING: begin // Start a trigger count cycle 0
-                    if(loop_state == RESETTING) begin // If we made it here, reset was completed
+                    if(loop_state == RESETTING) begin // If we made it here, reset was completed 
                         loop_state <= RUNNING;  
+                    end
+                    if(loop_state == WRITE_MANUAL_DONE) begin // If we made it here, manual write was complete
+                        loop_state <= STOPPED;  
                     end
                     if(comm_FSM_state == COMM_SENDING) begin
                         do_write_to_trigger(22'h0, 32'h1);
@@ -289,6 +303,8 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
                     if(comm_FSM_state == COMM_SENDING) begin
                         if(loop_state_request == RESETTING) begin
                             threshold_FSM_state <= THRESHOLD_RESETTING;
+                        end else if(loop_state_request == WRITE_MANUAL_DONE) begin
+                            threshold_FSM_state <= THRESHOLD_MANUAL;
                         end else begin
                             do_read_req_trigger(22'h0);
                             comm_FSM_state <= COMM_WAITING;
@@ -394,6 +410,8 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
                             threshold_FSM_state <= THRESHOLD_POLLING;   
                             if(loop_state == WRITE_RESET) begin
                                 loop_state <= RESETTING;  
+                            end else if(loop_state == WRITE_MANUAL) begin
+                                loop_state <= WRITE_MANUAL_DONE;  
                             end
                         end
                     end 
@@ -403,6 +421,12 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
                     threshold_FSM_state <= THRESHOLD_WRITING;
                     comm_FSM_state <= COMM_SENDING;
                     loop_state <= WRITE_RESET;
+                    beam_idx <= 0;
+                end
+                THRESHOLD_MANUAL: begin //
+                    threshold_FSM_state <= THRESHOLD_WRITING;
+                    comm_FSM_state <= COMM_SENDING;
+                    loop_state <= WRITE_MANUAL;
                     beam_idx <= 0;
                 end
                 default:begin // Boot delay 8
