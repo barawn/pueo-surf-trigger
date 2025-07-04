@@ -281,7 +281,7 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
                     end else if(wb_dat_i == 32'h00000002) begin: SEND_TO_PAUSE
                         loop_state_request <= STOPPED;
                     end
-                end else if (`ADDR_MATCH(wb_adr_i[13:0], 14'h1004, 14'h3FFF)) begin: REQ_SOFT_RESET
+                end else if (`ADDR_MATCH(wb_adr_i[13:0], 14'h1001, 14'h3FFF)) begin: REQ_SOFT_RESET
                     if(wb_dat_i[0]) soft_reset <= 1;
                     if(wb_dat_i[1]) agc_reset  <= 1;
                 end else if (`ADDR_MATCH(wb_adr_i[13:0], 14'h0800, 14'h3800)) begin: MANUAL_THRESHOLD_WRITE // Manually write a threshold
