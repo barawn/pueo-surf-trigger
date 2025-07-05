@@ -9,8 +9,7 @@ module agc_wrapper(
         input aresetn, // TODO: Unused?
         input [95:0] dat_i,
         
-        output [39:0] dat_o,
-        output [95:0] probes
+        output [39:0] dat_o
     );
     
     parameter WBCLKTYPE = "PSCLK";
