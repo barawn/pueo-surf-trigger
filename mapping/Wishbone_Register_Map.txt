@@ -17,11 +17,17 @@ Wishbone Address Space For L1 Trigger
                      Value 0: Reset loop.
                      Value 1: Start loop updating thresholds.
                      Value 2: Stop loop from updating thresholds.
-            0x1004:  Write reset flag, value chooses what gets reset.
-                     Value 0: No Effect
-                     Value 1: Reset just the threshold control loop
-                     Value 2: Reset just the AGCs (all channels)
-                     Value 3: Reset both threshold control loop and AGCs
+            0x1004:  Bitfield of resets.
+	             Bit 0 : reset threshold loop
+		     Bit 1 : reset AGC loop
+		     Bit 8 : reset the trigger generator
+            0x1008:  Bitfield B for beam masks.
+            	     Bits 17:0 - masks for beams 17-0
+		     Bit  31   - update masks
+	    0x100C:  Bitfield A for beam masks.
+	             Bits 29:0 - masks for beams 47 to 18
+		     Bit  31   - update masks
+
    0x1005 - 0x1FFF:  UNUSED
    0x2000 - 0x3FFF:  UNUSED (may shadow some reads)
 
