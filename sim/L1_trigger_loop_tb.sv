@@ -42,6 +42,21 @@ module L1_trigger_loop_tb;
     wire [1:0] loop_state;
     
     reg trig_count_done = 0;
+    reg [8:0] trig_counter = {9{1'b0}};
+    reg trig_count_running = 0;
+    always @(posedge wb_clk) begin
+        if (trig_count_running) trig_counter <= trig_counter[7:0] + 1;
+        else trig_counter <= {8{1'b0}};
+        
+        if (wb_cyc_o && wb_stb_o && wb_we_o && wb_adr_o == 22'd0 && wb_dat_o[0])
+            trig_count_running <= 1;
+        else if (trig_counter[8])
+            trig_count_running <= 0;
+            
+        if (trig_counter[8]) trig_count_done <= 1;
+        else if (wb_cyc_o && wb_stb_o && wb_we_o && wb_adr_o == 22'd0 && wb_dat_o[0]) trig_count_done <= 0;                        
+    end
+
     
     L1_trigger_loop uut(.wb_clk_i(wb_clk),
                         .loop_enable_i(loop_enable),
@@ -101,7 +116,13 @@ module L1_trigger_loop_tb;
         new_thresh(15, 2000);
         $display("In stop state, trying update");
         thresh_update();
-        $display("Update done?");
+        $display("Update done");
+        
+        #1000;
+        $display("Moving to pause state");
+        @(posedge wb_clk); #1 loop_state_req = 3;
+        while (loop_state != loop_state_req) @(posedge wb_clk);
+        $display("In pause state");
     end                        
                         
 endmodule
