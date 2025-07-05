@@ -37,7 +37,7 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
         output [39:0] dat_o
     );
 
-    localparam FILTER_TYPE = "IPCORE";
+    localparam FILTER_TYPE = "HDL";
 
     // QUALITY OF LIFE FUNCTIONS
 
