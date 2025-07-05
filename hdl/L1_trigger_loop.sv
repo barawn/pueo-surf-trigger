@@ -276,7 +276,8 @@ module L1_trigger_loop #(parameter WBCLKTYPE = "NONE",
         // THRESHOLD_BEAM_INCREMENT
         if (state == IDLE || state == THRESHOLD_WRITE_WAIT)
             dat <= `DLYFF 32'h1;   // start or CE
-        else if (state == THRESHOLD_BEAM_INCREMENT && beam_loop_complete)
+        else if ((state == THRESHOLD_BEAM_INCREMENT && beam_loop_complete) ||
+                (state == STOP_PREP && thresh_upd_i))
             dat <= `DLYFF 32'h2; // update                       
         else if (state == RESET_PREP_WRITE || 
                  (state == STOP_PREP && !thresh_upd_i) ||
