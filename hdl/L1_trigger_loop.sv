@@ -214,10 +214,8 @@ module L1_trigger_loop #(parameter WBCLKTYPE = "NONE",
                    end
             COUNT_START: if (loop_ack_i) state <= `DLYFF COUNT_WAIT;
             COUNT_WAIT: if (trig_count_done_i) state <= `DLYFF COUNT_READ;
-            COUNT_READ: if (loop_ack_i) begin
-                            if (loop_state == LOOP_RUN) state <= `DLYFF THRESHOLD_CALCULATE;
-                            else state <= `DLYFF COUNT_BEAM_INCREMENT;
-                        end                            
+            // just boldly go through and gate off the write instead
+            COUNT_READ: if (loop_ack_i) state <= `DLYFF THRESHOLD_CALCULATE;
             THRESHOLD_CALCULATE: state <= `DLYFF COUNT_BEAM_INCREMENT;
             // The sleaze here gives time for the beam index to reset.
             // clk  state                       beam_idx
@@ -295,7 +293,7 @@ module L1_trigger_loop #(parameter WBCLKTYPE = "NONE",
                 threshold_tmp <= `DLYFF thresh_dat_i;
         end
         // update the RAM
-        if (state == THRESHOLD_CALCULATE || state == RESETTING || (state == STOP_PREP && thresh_wr_i))
+        if ((state == THRESHOLD_CALCULATE && loop_state == LOOP_RUN)|| state == RESETTING || (state == STOP_PREP && thresh_wr_i))
             threshold_recalculated_regs[cur_beam] <= `DLYFF threshold_tmp;
     end
 
