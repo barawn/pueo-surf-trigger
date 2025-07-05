@@ -25,8 +25,8 @@ module L1_trigger_loop_tb;
     reg loop_enable = 0;
     wire reset_complete;
 
-    reg [31:0] target_rate = {32{1'b0}};
-    reg [15:0] target_delta = {16{1'b0}};
+    reg [31:0] target_rate = 100;
+    reg [15:0] target_delta = 5;
     
     reg [31:0] thresh_dat = {32{1'b0}};
     reg [5:0] thresh_idx = {6{1'b0}};
@@ -123,6 +123,12 @@ module L1_trigger_loop_tb;
         @(posedge wb_clk); #1 loop_state_req = 3;
         while (loop_state != loop_state_req) @(posedge wb_clk);
         $display("In pause state");
+        
+        #5000;
+        $display("Moving to run state");
+        @(posedge wb_clk); #1 loop_state_req = 1;
+        while (loop_state != loop_state_req) @(posedge wb_clk);
+        $display("In run state");
     end                        
                         
 endmodule
