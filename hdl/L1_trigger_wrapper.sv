@@ -1,6 +1,5 @@
 `timescale 1ns / 1ps
 `include "interfaces.vh"
-`include "debug_enable.vh"
 
 `define DLYFF #0.1
 `define STARTTHRESH 18'd4500
@@ -22,12 +21,127 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
         input aclk,
         input [7:0][95:0] dat_i,
         
-        `ifdef USING_DEBUG
-        output [7:0][39:0] dat_o,
-        output [7:0][1:0][95:0] dat_debug,
-        `endif
+        output [47:0] mask_o,
+        output [1:0] mask_wr_o,
+        output mask_update_o,
+        output gen_rst_o,
+
         output [NBEAMS-1:0] trigger_o
     );
+
+    `define ADDR_MATCH( addr, val, mask ) ( ( addr & mask ) == (val & mask) )
+    localparam [9:0] THRESHOLD_MASK = {10{1'b1}};
+    localparam NBITS_KP = 32;
+    localparam NFRAC_KP = 10;
+
+    // Pass commands not about trigger rate control loop down
+    `DEFINE_WB_IF( wb_L1_submodule_ , 22, 32);
+    `DEFINE_WB_IF( wb_threshold_ , 22, 32);
+
+    reg soft_reset = 0;
+    reg agc_reset = 0;
+
+    (* CUSTOM_CC_SRC = WBCLKTYPE *)
+    reg [47:0] mask_reg = {48{1'b1}};
+    // these have to go to a flag sync
+    reg [1:0] mask_wr = 2'b00;
+    reg mask_preupdate = 0;
+    // also a flag sync
+    reg mask_update = 0;
+    (* CUSTOM_CC_SRC = WBCLKTYPE *)
+    reg trig_gen_rst = 0;
+    
+    (* CUSTOM_CC_DST = WBCLKTYPE *)
+    reg [21:0] address_threshold = {22{1'b0}};
+
+    (* CUSTOM_CC_DST = WBCLKTYPE *)
+    reg [31:0] data_threshold_o = {32{1'b0}};
+    //reg [31:0] data_threshold_i;
+    
+    (* CUSTOM_CC_DST = WBCLKTYPE *)
+    reg use_threshold_wb = 0; // QOL tie these together if not ever implementing writing
+    
+    (* CUSTOM_CC_DST = WBCLKTYPE *)
+    reg wr_threshold_wb = 0; // QOL tie these together if not ever implementing writing
+    
+    wire wb_control_loop_cyc_i;
+   
+    (* CUSTOM_CC_DST = WBCLKTYPE *)
+    reg [31:0] response_reg = 32'h0; // Pass back trigger count information
+
+    // (* CUSTOM_CC_DST = WBCLKTYPE *)
+    // reg [31:0] trigger_count_wb_reg; // Pass back # of triggers on WB
+
+    (* CUSTOM_CC_DST = WBCLKTYPE *)
+    reg [31:0] trigger_target_wb_reg = STARTING_TARGET; // The target number of triggers in the sample period
+
+    // (* CUSTOM_CC_DST = WBCLKTYPE *)
+    // reg [31:0] trigger_threshold_wb_reg; // Pass back threshold value on WB
+
+    (* CUSTOM_CC_DST = WBCLKTYPE *)
+    reg [NBITS_KP-1:0] trigger_control_delta = STARTING_DELTA; // Delta change of threshold
+    
+    (* CUSTOM_CC_SRC = WBCLKTYPE *) // Store the last measured counts (rates) here
+    reg [NBEAMS-1:0][31:0] trigger_count_reg = {(NBEAMS*32){1'b0}};
+
+    (* CUSTOM_CC_SRC = WBCLKTYPE *) // Store the to-be updated thresholds here
+    reg [NBEAMS-1:0][17:0] threshold_recalculated_regs = {NBEAMS{`STARTTHRESH}};
+
+    (* CUSTOM_CC_SRC = WBCLKTYPE *) // Store the thresholds here
+    reg [NBEAMS-1:0][17:0] threshold_regs = {NBEAMS{`STARTTHRESH}};
+
+    // (* CUSTOM_CC_SRC = WBCLKTYPE *)
+    // reg [17:0] threshold_writing = {18{1'b0}};
+
+    (* CUSTOM_CC_DST = WBCLKTYPE *)
+    reg [31:0] trigger_response = 32'h0; // L1 trigger replies
+
+    // State of the trigger adjustment loop
+    localparam LOOP_STATE_BITS = 3;
+    localparam [LOOP_STATE_BITS-1:0] RUNNING       = 0;
+    localparam [LOOP_STATE_BITS-1:0] RESETTING     = 1;
+    localparam [LOOP_STATE_BITS-1:0] WRITE_RESET   = 2;
+    localparam [LOOP_STATE_BITS-1:0] STOPPED       = 3;
+    localparam [LOOP_STATE_BITS-1:0] WRITE_MANUAL  = 4;
+    localparam [LOOP_STATE_BITS-1:0] WRITE_MANUAL_DONE  = 5;
+
+    reg [LOOP_STATE_BITS-1:0] loop_state = RUNNING;   
+    reg [LOOP_STATE_BITS-1:0] loop_state_request = RUNNING;   
+
+    // Upstream State machine control
+    localparam FSM_BITS = 3;
+    localparam [FSM_BITS-1:0] IDLE  = 0;
+    localparam [FSM_BITS-1:0] WRITE = 1;
+    localparam [FSM_BITS-1:0] READ  = 2;
+    localparam [FSM_BITS-1:0] ACK   = 3;
+    localparam [FSM_BITS-1:0] WAIT  = 4;
+    reg [FSM_BITS-1:0] state = IDLE;   
+
+//    reg threshold_write_flag = 0;
+//    reg threshold_write_flag_done = 0;
+
+    // Downstream State machine control
+    localparam THRESHOLD_FSM_BITS = 4;
+    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_POLLING = 0;
+    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_WAITING = 1;
+    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_READING = 2;
+    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_CALCULATING = 3;
+    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_WRITING = 4;
+    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_APPLYING = 5;
+    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_UPDATING = 6;
+    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_RESETTING = 7;
+    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_BOOT_DELAY = 8;
+    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_MANUAL = 9;
+
+    localparam COMM_FSM_BITS = 2;
+    localparam [COMM_FSM_BITS-1:0] COMM_SENDING = 0;
+    localparam [COMM_FSM_BITS-1:0] COMM_WAITING = 1;
+    localparam [COMM_FSM_BITS-1:0] COMM_PROCESSING = 2;
+
+    reg [THRESHOLD_FSM_BITS-1:0] threshold_FSM_state = THRESHOLD_BOOT_DELAY;  
+    reg [COMM_FSM_BITS-1:0] comm_FSM_state = COMM_SENDING;  
+    reg [$clog2(NBEAMS)+1:0] beam_idx = 0; // Control what beam we are looking at
+    reg [4:0] boot_delay_count = 5'b11111;
 
     task do_write_to_trigger; 
         input [21:0] in_addr;
@@ -68,135 +182,12 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
         end
     endtask
 
-    `define ADDR_MATCH( addr, val, mask ) ( ( addr & mask ) == (val & mask) )
-    localparam [9:0] THRESHOLD_MASK = {10{1'b1}};
-    localparam NBITS_KP = 32;
-    localparam NFRAC_KP = 10;
-
-    // Pass commands not about trigger rate control loop down
-    `DEFINE_WB_IF( wb_L1_submodule_ , 22, 32);
-    `DEFINE_WB_IF( wb_threshold_ , 22, 32);
-
-    reg soft_reset = 0;
-    reg agc_reset = 0;
-    
-    (* CUSTOM_CC_DST = WBCLKTYPE *)
-    reg [21:0] address_threshold = {22{1'b0}};
-
-    (* CUSTOM_CC_DST = WBCLKTYPE *)
-    reg [31:0] data_threshold_o = {32{1'b0}};
-    //reg [31:0] data_threshold_i;
-    
-    (* CUSTOM_CC_DST = WBCLKTYPE *)
-    reg use_threshold_wb = 0; // QOL tie these together if not ever implementing writing
-    
-    (* CUSTOM_CC_DST = WBCLKTYPE *)
-    reg wr_threshold_wb = 0; // QOL tie these together if not ever implementing writing
-
-    assign wb_threshold_dat_o = data_threshold_o;
-    // assign data_threshold_i = wb_threshold_dat_i;
-    assign wb_threshold_adr_o = address_threshold;
-    assign wb_threshold_cyc_o = use_threshold_wb;
-    assign wb_threshold_stb_o = use_threshold_wb;
-    assign wb_threshold_we_o = wr_threshold_wb; // Tie this in too if only ever writing
-    assign wb_threshold_sel_o = {4{use_threshold_wb}};
-
-    // //  Top interface target (S)        Connection interface (M)
-    assign wb_ack_o = (wb_adr_i[14]) ? wb_L1_submodule_ack_i : (state == ACK);
-    assign wb_err_o = (wb_adr_i[14]) ? wb_L1_submodule_err_i : 1'b0;
-    assign wb_rty_o = (wb_adr_i[14]) ? wb_L1_submodule_rty_i : 1'b0;
-    assign wb_dat_o = (wb_adr_i[14]) ? wb_L1_submodule_dat_i : response_reg;
-    
-    wire wb_control_loop_cyc_i;
-
-    assign wb_L1_submodule_cyc_o = wb_cyc_i && wb_adr_i[14];
-    assign wb_control_loop_cyc_i = wb_cyc_i && !wb_adr_i[14];
-    assign wb_L1_submodule_stb_o = wb_stb_i;
-    assign wb_L1_submodule_adr_o = wb_adr_i;
-    assign wb_L1_submodule_dat_o = wb_dat_i;
-    assign wb_L1_submodule_we_o = wb_we_i;
-    assign wb_L1_submodule_sel_o = wb_sel_i;  
-
-   
-    (* CUSTOM_CC_DST = WBCLKTYPE *)
-    reg [31:0] response_reg = 32'h0; // Pass back trigger count information
-
-    // (* CUSTOM_CC_DST = WBCLKTYPE *)
-    // reg [31:0] trigger_count_wb_reg; // Pass back # of triggers on WB
-
-    (* CUSTOM_CC_DST = WBCLKTYPE *)
-    reg [31:0] trigger_target_wb_reg = STARTING_TARGET; // The target number of triggers in the sample period
-
-    // (* CUSTOM_CC_DST = WBCLKTYPE *)
-    // reg [31:0] trigger_threshold_wb_reg; // Pass back threshold value on WB
-
-    (* CUSTOM_CC_DST = WBCLKTYPE *)
-    reg [NBITS_KP-1:0] trigger_control_delta = STARTING_DELTA; // Delta change of threshold
-    
-    (* CUSTOM_CC_SRC = WBCLKTYPE *) // Store the last measured counts (rates) here
-    reg [NBEAMS-1:0][31:0] trigger_count_reg = {(NBEAMS*32){1'b0}};
-
-    (* CUSTOM_CC_SRC = WBCLKTYPE *) // Store the to-be updated thresholds here
-    reg [NBEAMS-1:0][17:0] threshold_recalculated_regs = {NBEAMS{`STARTTHRESH}};
-
-    (* CUSTOM_CC_SRC = WBCLKTYPE *) // Store the thresholds here
-    reg [NBEAMS-1:0][17:0] threshold_regs = {NBEAMS{`STARTTHRESH}};
-
-    // (* CUSTOM_CC_SRC = WBCLKTYPE *)
-    // reg [17:0] threshold_writing = {18{1'b0}};
-
-    (* CUSTOM_CC_DST = WBCLKTYPE *)
-    reg [31:0] trigger_response = 32'h0; // L1 trigger replies
-
-    // State of the trigger adjustment loop
-    localparam LOOP_STATE_BITS = 3;
-    localparam [FSM_BITS-1:0] RUNNING       = 0;
-    localparam [FSM_BITS-1:0] RESETTING     = 1;
-    localparam [FSM_BITS-1:0] WRITE_RESET   = 2;
-    localparam [FSM_BITS-1:0] STOPPED       = 3;
-    localparam [FSM_BITS-1:0] WRITE_MANUAL  = 4;
-    localparam [FSM_BITS-1:0] WRITE_MANUAL_DONE  = 5;
-
-    reg [FSM_BITS-1:0] loop_state = RUNNING;   
-    reg [FSM_BITS-1:0] loop_state_request = RUNNING;   
-
-    // Upstream State machine control
-    localparam FSM_BITS = 3;
-    localparam [FSM_BITS-1:0] IDLE  = 0;
-    localparam [FSM_BITS-1:0] WRITE = 1;
-    localparam [FSM_BITS-1:0] READ  = 2;
-    localparam [FSM_BITS-1:0] ACK   = 3;
-    localparam [FSM_BITS-1:0] WAIT  = 4;
-    reg [FSM_BITS-1:0] state = IDLE;   
-
-    reg threshold_write_flag = 0;
-    reg threshold_write_flag_done = 0;
-
-    // Downstream State machine control
-    localparam THRESHOLD_FSM_BITS = 4;
-    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_POLLING = 0;
-    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_WAITING = 1;
-    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_READING = 2;
-    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_CALCULATING = 3;
-    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_WRITING = 4;
-    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_APPLYING = 5;
-    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_UPDATING = 6;
-    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_RESETTING = 7;
-    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_BOOT_DELAY = 8;
-    localparam [THRESHOLD_FSM_BITS-1:0] THRESHOLD_MANUAL = 9;
-
-    localparam COMM_FSM_BITS = 2;
-    localparam [COMM_FSM_BITS-1:0] COMM_SENDING = 0;
-    localparam [COMM_FSM_BITS-1:0] COMM_WAITING = 1;
-    localparam [COMM_FSM_BITS-1:0] COMM_PROCESSING = 2;
-
-    reg [THRESHOLD_FSM_BITS-1:0] threshold_FSM_state = THRESHOLD_BOOT_DELAY;  
-    reg [THRESHOLD_FSM_BITS-1:0] comm_FSM_state = COMM_SENDING;  
-    reg [$clog2(NBEAMS)+1:0] beam_idx = 0; // Control what beam we are looking at
-    reg [4:0] boot_delay_count = 5'b11111;
-
-
     always @(posedge wb_clk_i) begin
+        mask_wr[0] <= wb_cyc_i && wb_stb_i && wb_we_i && wb_ack_o && `ADDR_MATCH(wb_adr_i[13:0], 14'h1008, 14'h3FFF);
+        mask_wr[1] <= wb_cyc_i && wb_stb_i && wb_we_i && wb_ack_o && `ADDR_MATCH(wb_adr_i[13:0], 14'h100C, 14'h3FFF);
+        mask_preupdate <= wb_dat_i[31] && wb_cyc_i && wb_stb_i && wb_we_i && wb_ack_o && `ADDR_MATCH(wb_adr_i[13:0], 14'h1008, 14'h3FFB);
+        mask_update <= mask_preupdate;
+        
         if (wb_rst_i) begin // Reset everything
             state <= IDLE;
             loop_state <= RUNNING;
@@ -212,8 +203,8 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
             comm_FSM_state <= COMM_SENDING;
             beam_idx <= 0;
             boot_delay_count <= 5'b11111;
-            threshold_write_flag <= 0;
-            threshold_write_flag_done <= 0;
+//            threshold_write_flag <= 0;
+//            threshold_write_flag_done <= 0;
             soft_reset <= 0;
             agc_reset <= 0;
         end else if (soft_reset) begin // Reset everything, send to ACK
@@ -231,8 +222,8 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
             comm_FSM_state <= COMM_SENDING;
             beam_idx <= 0;
             boot_delay_count <= 5'b11111;
-            threshold_write_flag <= 0;
-            threshold_write_flag_done <= 0;
+//            threshold_write_flag <= 0;
+//            threshold_write_flag_done <= 0;
             soft_reset <= 0;
             agc_reset <= 0;
         end else begin
@@ -284,6 +275,11 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
                 end else if (`ADDR_MATCH(wb_adr_i[13:0], 14'h1004, 14'h3FFF)) begin: REQ_SOFT_RESET
                     if(wb_dat_i[0]) soft_reset <= 1;
                     if(wb_dat_i[1]) agc_reset  <= 1;
+                    trig_gen_rst <= wb_dat_i[8];
+                end else if (`ADDR_MATCH(wb_adr_i[13:0], 14'h1008, 14'h3FFF)) begin
+                    mask_reg[17:0] <= wb_dat_i[17:0];
+                end else if (`ADDR_MATCH(wb_adr_i[13:0], 14'h100C, 14'h3FFF)) begin
+                    mask_reg[18 +: 30] <= wb_dat_i[0 +: 30];
                 end else if (`ADDR_MATCH(wb_adr_i[13:0], 14'h0800, 14'h3800)) begin: MANUAL_THRESHOLD_WRITE // Manually write a threshold
                     if(loop_state == STOPPED && loop_state_request != WRITE_MANUAL_DONE) begin
                         // Write in new threshold
@@ -484,11 +480,32 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
             .aclk(aclk),
             .dat_i(dat_i),
             
-            `ifdef USING_DEBUG
-            .dat_o(dat_o),
-            .dat_debug(dat_debug),
-            `endif
-            
             .trigger_o(trigger_o));
 
+    assign wb_threshold_dat_o = data_threshold_o;
+    // assign data_threshold_i = wb_threshold_dat_i;
+    assign wb_threshold_adr_o = address_threshold;
+    assign wb_threshold_cyc_o = use_threshold_wb;
+    assign wb_threshold_stb_o = use_threshold_wb;
+    assign wb_threshold_we_o = wr_threshold_wb; // Tie this in too if only ever writing
+    assign wb_threshold_sel_o = {4{use_threshold_wb}};
+
+    // //  Top interface target (S)        Connection interface (M)
+    assign wb_ack_o = (wb_adr_i[14]) ? wb_L1_submodule_ack_i : (state == ACK);
+    assign wb_err_o = (wb_adr_i[14]) ? wb_L1_submodule_err_i : 1'b0;
+    assign wb_rty_o = (wb_adr_i[14]) ? wb_L1_submodule_rty_i : 1'b0;
+    assign wb_dat_o = (wb_adr_i[14]) ? wb_L1_submodule_dat_i : response_reg;
+
+    assign wb_L1_submodule_cyc_o = wb_cyc_i && wb_adr_i[14];
+    assign wb_control_loop_cyc_i = wb_cyc_i && !wb_adr_i[14];
+    assign wb_L1_submodule_stb_o = wb_stb_i;
+    assign wb_L1_submodule_adr_o = wb_adr_i;
+    assign wb_L1_submodule_dat_o = wb_dat_i;
+    assign wb_L1_submodule_we_o = wb_we_i;
+    assign wb_L1_submodule_sel_o = wb_sel_i;  
+
+    assign mask_o = mask_reg;
+    assign mask_wr_o = mask_wr;
+    assign mask_update_o = mask_update;
+    assign gen_rst_o = trig_gen_rst;
 endmodule
