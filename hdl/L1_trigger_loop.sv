@@ -241,8 +241,10 @@ module L1_trigger_loop #(parameter WBCLKTYPE = "NONE",
                                 if (loop_state == LOOP_RESET) state <= `DLYFF RESET_COMPLETE;
                                 else state <= `DLYFF IDLE;
                               end
+            // jumping to THRESHOLD_BEAM_INCREMENT buys us the clock needed
+            // so that the RAM output updates
             STOP_PREP: if (thresh_upd_i) state <= `DLYFF THRESHOLD_UPDATE;
-                       else state <= `DLYFF THRESHOLD_WRITE;                              
+                       else state <= `DLYFF THRESHOLD_BEAM_INCREMENT;                              
         endcase
 
         if (state == RESET_START || state == IDLE || beam_loop_complete)
