@@ -9,7 +9,12 @@
 
 
 module beamform_trigger #(  parameter NBEAMS = 2,
-                            parameter WBCLKTYPE = "PSCLK", parameter CLKTYPE = "ACLK") (
+                            parameter WBCLKTYPE = "PSCLK", 
+                            parameter CLKTYPE = "ACLK",
+                            // thank you SV 2009
+                            localparam NBITS=5,
+                            localparam NSAMP=8,
+                            localparam NCHAN=8) (
         input clk_i,
         input [NCHAN-1:0][NSAMP*NBITS-1:0] data_i,
 
@@ -20,10 +25,6 @@ module beamform_trigger #(  parameter NBEAMS = 2,
         output [NBEAMS-1:0] trigger_o
     );
 
-    // Moving these to localparams, since this module will break with unexpected values.
-    localparam NBITS=5;
-    localparam NSAMP=8; 
-    localparam NCHAN=8;
     localparam SAMPLE_STORE_DEPTH = 8+2; // The +2 is for aligning antenna 0 to the same place every time, even with a "negative delay"
 
     generate
