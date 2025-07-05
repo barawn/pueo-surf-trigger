@@ -1,7 +1,6 @@
 `timescale 1ns / 1ps
 `include "interfaces.vh"
 
-
 `define STARTSCALE 18'd1800
 `define STARTOFFSET 16'd0
 
@@ -35,13 +34,36 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
         input aclk,
         input [95:0] dat_i,
         
-        `ifdef USING_DEBUG
-        output [1:0][95:0] dat_debug,
-        `endif
         output [39:0] dat_o
     );
 
+    localparam FILTER_TYPE = "IPCORE";
+
     // QUALITY OF LIFE FUNCTIONS
+
+    // UNPACK is 128 -> 96
+    function [95:0] unpack_le;  // 12 LSBs every 16
+        input [127:0] data_in;
+        integer i;
+        begin
+            for (i=0;i<8;i=i+1) begin
+                unpack_le[12*i +: 12] = data_in[16*i +: 12];
+            end
+        end
+    endfunction
+
+    // PACK is 96 -> 128
+    function [127:0] pack_le;   // 12 LSBs every 16
+        input [95:0] data_in;
+        integer i;
+        begin
+            for (i=0;i<8;i=i+1) begin
+                pack_le[16*i +: 12] = data_in[12*i +: 12];
+                pack_le[(16*i + 12) +: 4] = {4{1'b0}};
+            end
+        end
+    endfunction    
+
 
     // UNPACK is 128 -> 96
     function [95:0] unpack;
@@ -66,6 +88,69 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
         end
     endfunction    
 
+    `define ADDR_MATCH( addr, val, mask ) ( ( addr & mask ) == (val & mask) )
+    localparam [7:0] AGC_MASK = {8{1'b1}}; // May be unused
+    // localparam NBITS_KP = 32;
+    // localparam NFRAC_KP = 10;
+
+    // WB interface to actual AGC module
+    `DEFINE_WB_IF( wb_agc_module_ , 8, 32);
+
+    // DOWNSTREAM CONTROL ///////////////////////////////////////////////////
+    (* CUSTOM_CC_DST = WBCLKTYPE *)
+    reg [21:0] address_agc = {8{1'b0}};
+
+    (* CUSTOM_CC_DST = WBCLKTYPE *)
+    reg [31:0] data_agc_o = {32{1'b0}};
+    
+    (* CUSTOM_CC_DST = WBCLKTYPE *)
+    reg use_agc_wb = 0; 
+    
+    (* CUSTOM_CC_DST = WBCLKTYPE *)
+    reg wr_agc_wb = 0; 
+
+    assign wb_agc_module_dat_o = data_agc_o;
+    assign wb_agc_module_adr_o = address_agc;
+    assign wb_agc_module_cyc_o = use_agc_wb;
+    assign wb_agc_module_stb_o = use_agc_wb;
+    assign wb_agc_module_we_o = wr_agc_wb; // Tie this in too if only ever writing
+    assign wb_agc_module_sel_o = {4{use_agc_wb}};
+
+   
+    (* CUSTOM_CC_DST = WBCLKTYPE *)
+    reg [31:0] response_reg = 32'h0; // Pass back AGC information
+
+    (* CUSTOM_CC_DST = WBCLKTYPE *)
+    reg [5:0][31:0] agc_module_info_reg = {(6*32){1'b0}}; // Store of downstream AGC info
+    wire[24:0] agc_sq_adjusted = {{(17-AGC_TIMESCALE_REDUCTION_BITS){1'd0}},{agc_module_info_reg[1][24:17-AGC_TIMESCALE_REDUCTION_BITS]}};
+
+
+    (* CUSTOM_CC_DST = WBCLKTYPE *)
+    reg [16:0] agc_control_scale_delta = STARTING_SCALE_DELTA; // change amount 
+    
+    (* CUSTOM_CC_DST = WBCLKTYPE *)
+    reg [15:0] agc_control_offset_delta = STARTING_OFFSET_DELTA; // change amount 
+
+    (* CUSTOM_CC_SRC = WBCLKTYPE *) // Store the to-be updated agcs here
+    reg [16:0] agc_recalculated_scale_reg = `STARTSCALE;
+    
+    (* CUSTOM_CC_SRC = WBCLKTYPE *) // Store the to-be updated agcs here
+    reg [15:0] agc_recalculated_offset_reg = `STARTOFFSET;
+
+
+    // (* CUSTOM_CC_SRC = WBCLKTYPE *) // Store the agcs here
+    // reg [NBEAMS-1:0][17:0] agc_regs = {NBEAMS{`STARTTHRESH}};
+
+    (* CUSTOM_CC_DST = WBCLKTYPE *)
+    reg [31:0] agc_module_response = 32'h0; 
+
+    // Upstream State machine control
+    localparam FSM_BITS = 2;
+    localparam [FSM_BITS-1:0] IDLE = 0;
+    localparam [FSM_BITS-1:0] WRITE = 1;
+    localparam [FSM_BITS-1:0] READ = 2;
+    localparam [FSM_BITS-1:0] ACK = 3;
+    reg [FSM_BITS-1:0] state = IDLE;   
 
     task do_write_to_agc; 
         input [21:0] in_addr;
@@ -105,78 +190,6 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
             address_agc = 22'h0;
         end
     endtask
-
-    `define ADDR_MATCH( addr, val, mask ) ( ( addr & mask ) == (val & mask) )
-    localparam [7:0] AGC_MASK = {8{1'b1}}; // May be unused
-    // localparam NBITS_KP = 32;
-    // localparam NFRAC_KP = 10;
-
-    // WB interface to actual AGC module
-    `DEFINE_WB_IF( wb_agc_module_ , 8, 32);
-
-    // DOWNSTREAM CONTROL ///////////////////////////////////////////////////
-    (* CUSTOM_CC_DST = WBCLKTYPE *)
-    reg [21:0] address_agc = {8{1'b0}};
-
-    (* CUSTOM_CC_DST = WBCLKTYPE *)
-    reg [31:0] data_agc_o = {32{1'b0}};
-    
-    (* CUSTOM_CC_DST = WBCLKTYPE *)
-    reg use_agc_wb = 0; 
-    
-    (* CUSTOM_CC_DST = WBCLKTYPE *)
-    reg wr_agc_wb = 0; 
-
-    assign wb_agc_module_dat_o = data_agc_o;
-    assign wb_agc_module_adr_o = address_agc;
-    assign wb_agc_module_cyc_o = use_agc_wb;
-    assign wb_agc_module_stb_o = use_agc_wb;
-    assign wb_agc_module_we_o = wr_agc_wb; // Tie this in too if only ever writing
-    assign wb_agc_module_sel_o = {4{use_agc_wb}};
-
-    // UPSTREAM RECEIVER ///////////////////////////////////////////////////
-    // WB interface to the AGC control loop (in this module)
-    // //  Top interface target (S)        Connection interface (M)
-    assign wb_agc_controller_ack_o = (state == ACK);
-    assign wb_agc_controller_err_o = 1'b0;
-    assign wb_agc_controller_rty_o = 1'b0;
-    assign wb_agc_controller_dat_o = response_reg;
-
-   
-    (* CUSTOM_CC_DST = WBCLKTYPE *)
-    reg [31:0] response_reg = 32'h0; // Pass back AGC information
-
-    (* CUSTOM_CC_DST = WBCLKTYPE *)
-    reg [5:0][31:0] agc_module_info_reg = {(6*32){1'b0}}; // Store of downstream AGC info
-    wire[24:0] agc_sq_adjusted = {{(17-AGC_TIMESCALE_REDUCTION_BITS){1'd0}},{agc_module_info_reg[1][24:17-AGC_TIMESCALE_REDUCTION_BITS]}};
-
-
-    (* CUSTOM_CC_DST = WBCLKTYPE *)
-    reg [16:0] agc_control_scale_delta = STARTING_SCALE_DELTA; // change amount 
-    
-    (* CUSTOM_CC_DST = WBCLKTYPE *)
-    reg [15:0] agc_control_offset_delta = STARTING_OFFSET_DELTA; // change amount 
-
-    (* CUSTOM_CC_SRC = WBCLKTYPE *) // Store the to-be updated agcs here
-    reg [16:0] agc_recalculated_scale_reg = `STARTSCALE;
-    
-    (* CUSTOM_CC_SRC = WBCLKTYPE *) // Store the to-be updated agcs here
-    reg [15:0] agc_recalculated_offset_reg = `STARTOFFSET;
-
-
-    // (* CUSTOM_CC_SRC = WBCLKTYPE *) // Store the agcs here
-    // reg [NBEAMS-1:0][17:0] agc_regs = {NBEAMS{`STARTTHRESH}};
-
-    (* CUSTOM_CC_DST = WBCLKTYPE *)
-    reg [31:0] agc_module_response = 32'h0; 
-
-    // Upstream State machine control
-    localparam FSM_BITS = 2;
-    localparam [FSM_BITS-1:0] IDLE = 0;
-    localparam [FSM_BITS-1:0] WRITE = 1;
-    localparam [FSM_BITS-1:0] READ = 2;
-    localparam [FSM_BITS-1:0] ACK = 3;
-    reg [FSM_BITS-1:0] state = IDLE;   
 
     //////////////////////////////////////////////////////////
     //////        Wishbone FSM For Upstream Comms       //////
@@ -423,24 +436,41 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
         end
     end
 
-    reg [95:0] data_stage_connection [5:0]; // In 12 bits since that's what the LPF works in
-
+    wire [95:0] lpf_out;
+    reg [95:0] pipe_to_filter = {96{1'b0}};
+    wire [95:0] match_out;
+    reg [95:0] pipe_to_biquad = {96{1'b0}};
+    wire [95:0] biquad_out;
+    
+    wire [95:0] to_agc;
+    
     always @(posedge aclk) begin
-        data_stage_connection[1] <= data_stage_connection[0]; // LPF to Matched Filter
-        data_stage_connection[3] <= data_stage_connection[2]; // Matched Filter to Biquad
-        data_stage_connection[5] <= data_stage_connection[4]; // Biquad out to AGC in
+        pipe_to_filter <= lpf_out;
+        pipe_to_biquad <= match_out;        
     end 
 
     // Low pass filter
-    shannon_whitaker_lpfull_v2 u_lpf (  .clk_i(aclk),
-                                        .in_i(dat_i),
-                                        .out_o(data_stage_connection[0]));
-
+    generate
+        if (FILTER_TYPE == "IPCORE") begin : I
+            wire [127:0] exp_in = pack_le(dat_i);
+            wire [127:0] exp_out;
+            assign lpf_out = unpack_le(exp_out);
+            halfband u_lpf(.s_axis_data_tdata(exp_in),
+                           .s_axis_data_tvalid(1'b1),
+                           .m_axis_data_tdata(exp_out),
+                           .aclk(aclk));
+        end else begin : H
+            shannon_whitaker_lpfull_v2 
+                u_lpf (  .clk_i(aclk),
+                         .in_i(dat_i),
+                         .out_o(lpf_out));
+        end
+    endgenerate
     // Matched Filter
     matched_filter u_matched_filter(
         .aclk(aclk),
-        .data_i(data_stage_connection[1]),
-        .data_o(data_stage_connection[2])
+        .data_i(pipe_to_filter),
+        .data_o(match_out)
     );
 
 
@@ -448,6 +478,11 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
     // Biquads
     generate
         if (USE_BIQUADS == "TRUE") begin : BQ2
+            reg [95:0] pipe_to_agc = {96{1'b0}};
+            assign to_agc = pipe_to_agc;
+            always @(posedge aclk) begin
+                pipe_to_agc <= biquad_out;
+            end
             biquad8_x2_wrapper #(.WBCLKTYPE(WBCLKTYPE),
                                  .CLKTYPE(CLKTYPE)) u_biquadx2(
                 .wb_clk_i(wb_clk_i),
@@ -455,22 +490,18 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                 `CONNECT_WBS_IFS( wb_ , wb_bq_ ),
                 .reset_BQ_i(reset_i),
                 .aclk(aclk),
-                .dat_i(data_stage_connection[3]),
-                .dat_o(data_stage_connection[4])
+                .dat_i(pipe_to_biquad),
+                .dat_o(biquad_out)
             );
         end else begin : BYP
             wbs_dummy #(.ADDRESS_WIDTH(8),.DATA_WIDTH(32))
                 u_bq(`CONNECT_WBS_IFS( wb_ , wb_bq_ ));
             // TODO replace this with the delay that you would normally
             // get from a biquad with unity gain
-            assign data_stage_connection[4] = data_stage_connection[3];
+            assign biquad_out = pipe_to_biquad;
+            assign to_agc = biquad_out;
         end
     endgenerate        
-
-    `ifdef USING_DEBUG
-        assign dat_debug[0] = data_stage_connection[0];
-        assign dat_debug[1] = data_stage_connection[2];
-    `endif
 
     agc_wrapper #(.TIMESCALE_REDUCTION((2**AGC_TIMESCALE_REDUCTION_BITS)),
                   .WBCLKTYPE(WBCLKTYPE),
@@ -481,10 +512,18 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
         `CONNECT_WBS_IFM( wb_ , wb_agc_module_ ),
         .aclk(aclk),
         .aresetn(reset_i),
-        .dat_i(data_stage_connection[5]),
+        .dat_i(to_agc),
         .dat_o(dat_o)
 
     );
+
+    // UPSTREAM RECEIVER ///////////////////////////////////////////////////
+    // WB interface to the AGC control loop (in this module)
+    // //  Top interface target (S)        Connection interface (M)
+    assign wb_agc_controller_ack_o = (state == ACK);
+    assign wb_agc_controller_err_o = 1'b0;
+    assign wb_agc_controller_rty_o = 1'b0;
+    assign wb_agc_controller_dat_o = response_reg;
 
 
 endmodule
