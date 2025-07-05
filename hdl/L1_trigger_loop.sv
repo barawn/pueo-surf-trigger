@@ -228,7 +228,7 @@ module L1_trigger_loop #(parameter WBCLKTYPE = "NONE",
             COUNT_BEAM_INCREMENT: if (beam_loop_complete) begin
                                     if (loop_state == LOOP_PAUSE) state <= `DLYFF IDLE;
                                     else state <= `DLYFF THRESHOLD_BEAM_INCREMENT;
-                                  end
+                                  end else state <= COUNT_READ;
             THRESHOLD_WRITE: if (loop_ack_i) state <= `DLYFF THRESHOLD_WRITE_WAIT;
             THRESHOLD_WRITE_WAIT: state <= `DLYFF THRESHOLD_APPLY;
             THRESHOLD_APPLY: if (loop_ack_i) begin
