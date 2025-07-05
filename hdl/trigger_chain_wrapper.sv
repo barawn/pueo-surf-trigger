@@ -200,7 +200,7 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
             response_reg <= 32'h0;
             agc_control_scale_delta <= STARTING_SCALE_DELTA;
             agc_control_offset_delta <= STARTING_OFFSET_DELTA;
-            agc_module_info_reg <= {(6*32){1'b0}};
+//            agc_module_info_reg <= {(6*32){1'b0}};
             // Add any other registers you want to reset here
         end else begin
             // Determine what we are doing this cycle
