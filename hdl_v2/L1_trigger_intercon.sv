@@ -2,8 +2,10 @@
 `include "interfaces.vh"
 // the L1 trigger interconnect isn't combinatoric, it's registered
 // because we want to cut down the cost and power to get to the stuff running in ACLK.
+// we'll see.
 module L1_trigger_intercon(
         input wb_clk_i,
+        input clock_enabled_i,
         `TARGET_NAMED_PORTS_WB_IF( wb_ , 15, 32 ),
         `HOST_NAMED_PORTS_WB_IF( thresh_ , 13, 32 ),
         `HOST_NAMED_PORTS_WB_IF( generator_ , 13, 32 ),
@@ -16,28 +18,28 @@ module L1_trigger_intercon(
     localparam [1:0] MODULE_AGC = 2'b10;
     localparam [1:0] MODULE_BQ = 2'b11;
     
-    wire [1:0]  module_select = (wb_adr_i[14:13]);
+    reg [1:0]   module_select = {2{1'b0}};
         
-    wire        thresh_select = (module_select == MODULE_THRESH);
+    wire        thresh_select = (module_select == MODULE_THRESH) && clock_enabled_i;
     reg         thresh_cyc = 0;
     reg         thresh_we = 0;
     reg [12:0]  thresh_adr = {13{1'b0}};
     reg [31:0]  thresh_dat = {32{1'b0}};
     
-    wire        generator_select = (module_select == MODULE_GENERATOR);
+    wire        generator_select = (module_select == MODULE_GENERATOR) && clock_enabled_i;
     reg         generator_cyc = 0;
     reg         generator_we = 0;
     reg [12:0]  generator_adr = {13{1'b0}};
     reg [31:0]  generator_dat = {32{1'b0}};
     
     
-    wire        agc_select = (module_select == MODULE_AGC);
+    wire        agc_select = (module_select == MODULE_AGC) && clock_enabled_i;
     reg         agc_cyc = 0;
     reg         agc_we = 0;
     reg [12:0]  agc_adr = {13{1'b0}};
     reg [31:0]  agc_dat = {32{1'b0}};
 
-    wire        bq_select = (module_select == MODULE_BQ);
+    wire        bq_select = (module_select == MODULE_BQ) && clock_enabled_i;
     reg         bq_cyc = 0;
     reg         bq_we = 0;
     reg [12:0]  bq_adr = {13{1'b0}};
@@ -46,59 +48,76 @@ module L1_trigger_intercon(
     reg [31:0]  mux_up_dat = {32{1'b0}};
     reg         mux_up_ack = 0;
     
+    reg         no_ack = 0;
+    
+    reg         we = 0;
+    
     localparam FSM_BITS = 2;
     localparam [FSM_BITS-1:0] IDLE = 0;
     localparam [FSM_BITS-1:0] TRANSACTION = 1;
-    localparam [FSM_BITS-1:0] FINISH = 2;
+    localparam [FSM_BITS-1:0] ACK = 2;
+    localparam [FSM_BITS-1:0] FINISH = 3;
     reg [FSM_BITS-1:0] state = IDLE;    
     
     always @(posedge wb_clk_i) begin
+        // goes high in first entry into transaction
+        // at that point the select is high, so downstream
+        // data will capture only then.
+        we <= (state == IDLE && wb_cyc_i && wb_we_i);
+                    
         if (!thresh_select) thresh_dat <= {32{1'b0}};
-        else if (wb_we_i) thresh_dat <= wb_dat_i;
+        else if (we) thresh_dat <= wb_dat_i;
         else if (thresh_ack_i) thresh_dat <= thresh_dat_i;
+        
         if (thresh_select && state == IDLE) thresh_adr <= wb_adr_i;
         if (thresh_select && state == IDLE) thresh_we <= wb_we_i;
         
         if (!generator_select) generator_dat <= {32{1'b0}};
-        else if (wb_we_i) generator_dat <= wb_dat_i;
+        else if (we) generator_dat <= wb_dat_i;
         else if (generator_ack_i) generator_dat <= generator_dat_i;
         if (generator_select && state == IDLE) generator_adr <= wb_adr_i;
         if (generator_select && state == IDLE) generator_we <= wb_we_i;
                 
         if (!agc_select) agc_dat <= {32{1'b0}};
-        else if (wb_we_i) agc_dat <= wb_dat_i;
+        else if (we) agc_dat <= wb_dat_i;
         else if (agc_ack_i) agc_dat <= agc_dat_i;
         if (agc_select && state == IDLE) agc_adr <= wb_adr_i;
         if (agc_select && state == IDLE) agc_we <= wb_we_i;
         
         
         if (!bq_select) bq_dat <= {32{1'b0}};
-        else if (wb_we_i) bq_dat <= wb_dat_i;
+        else if (we) bq_dat <= wb_dat_i;
         else if (bq_ack_i) bq_dat <= bq_dat_i;
         if (bq_select && state == IDLE) bq_adr <= wb_adr_i;
         if (bq_select && state == IDLE) bq_we <= wb_we_i;
 
         // wanna see something cool
         mux_up_dat <= thresh_dat | generator_dat | agc_dat | bq_dat;
-        mux_up_ack <= thresh_ack_i | generator_ack_i | agc_ack_i | bq_ack_i;
+        mux_up_ack <= thresh_ack_i | generator_ack_i | agc_ack_i | bq_ack_i | no_ack;
+
+        if (wb_cyc_i && state == IDLE)
+            module_select <= wb_adr_i[14:13];
         
         case (state)
             IDLE: if (wb_cyc_i) state <= TRANSACTION;
-            TRANSACTION: if (mux_up_ack) state <= FINISH;
+            TRANSACTION: state <= ACK;
+            ACK: if (mux_up_ack) state <= FINISH;
             FINISH: state <= IDLE;
         endcase            
 
-        if (state == IDLE && thresh_select) thresh_cyc <= 1;
-        else if (thresh_ack_i) thresh_cyc <= 0;
+        no_ack <= (state == IDLE && !clock_enabled_i);        
+
+        if (thresh_ack_i) thresh_cyc <= 0;
+        else if (state == TRANSACTION && thresh_select) thresh_cyc <= 1;
         
-        if (state == IDLE && generator_select) generator_cyc <= 1;
-        else if (generator_ack_i) generator_cyc <= 0;
+        if (generator_ack_i) generator_cyc <= 0;
+        else if (state == TRANSACTION && generator_select) generator_cyc <= 1;
         
-        if (state == IDLE && agc_select) agc_cyc <= 1;
-        else if (agc_ack_i) agc_cyc <= 0;
-        
-        if (state == IDLE && bq_select) bq_cyc <= 1;
-        else if (bq_ack_i) bq_cyc <= 0;
+        if (agc_ack_i) agc_cyc <= 0;
+        else if (state == TRANSACTION && agc_select) agc_cyc <= 1;
+
+        if (bq_ack_i) bq_cyc <= 0;        
+        else if (state == TRANSACTION && bq_select) bq_cyc <= 1;
     end
 
     assign wb_ack_o = (state == FINISH);
