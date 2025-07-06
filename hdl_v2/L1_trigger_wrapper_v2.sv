@@ -34,6 +34,8 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
     
     localparam AGC_BITS = 5;
     localparam NSAMPS=8;
+    localparam [31:0] TARGET_DEFAULT = 100;
+    localparam [15:0] DELTA_DEFAULT = 5;
 
     // our submodules 
    `DEFINE_WB_IF( thresh_ , 13, 32 );
@@ -54,26 +56,59 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
 
     // now we need a register core for the thresholds and generator.
     // interface to the L1
+    // loop control
     wire loop_enable;
     wire reset_complete;
     wire [1:0] loop_state_req;
     wire [1:0] loop_state;
+    // params
     wire [15:0] target_rate;
     wire [31:0] target_delta;
-    wire [31:0] thresh_data;
+    // scaler data
     wire [31:0] scal_data;
+    // beam index for both scalers and threshold
     wire [5:0]  beam_idx;
+    // thresholds
+    wire [17:0] new_thresh_dat;
+    wire [17:0] thresh_dat;
     wire thresh_update;
     wire thresh_wr;
     wire thresh_ack;
-    wire [47:0] mask;
-    wire [1:0] mask_wr;
-    wire mask_update;
+    
     // I dunno about these two
     wire first_reset;
     wire agc_reset;
     // register core
-    
+    L1_register_core #(.WBCLKTYPE(WBCLKTYPE),
+                       .TARGET_DEFAULT(TARGET_DEFAULT),
+                       .DELTA_DEFAULT(DELTA_DEFAULT))
+            u_levelone_regs(.wb_clk_i(wb_clk_i),
+                            `CONNECT_WBS_IFM( wb_ , thresh_ ),
+                            .loop_enable_o(loop_enable),
+                            .reset_complete_i(reset_complete),
+                            .loop_state_req_o(loop_state_req),
+                            .loop_state_i(loop_state),
+                            
+                            .target_rate_o(target_rate),
+                            .target_delta_o(target_delta),
+                            
+                            .scal_dat_i(scal_data),
+                            .beam_idx_o(beam_idx),
+                            
+                            .thresh_dat_i(thresh_dat),
+                            .thresh_dat_o(new_thresh_dat),
+                            .thresh_update_o(thresh_update),
+                            .thresh_wr_o(thresh_wr),
+                            .thresh_ack_i(thresh_ack),
+                            
+                            .mask_o(mask),
+                            .mask_wr_o(mask_wr),
+                            .mask_update_o(mask_update),
+                            .mask_rst_o(mask_reset),
+                            
+                            .first_reset_o(first_reset),
+                            .agc_reset_o(agc_reset));
+                                                   
 
     // trigger chain wrapper takes the agc and biquads    
     // AGC output over to the L1_trigger
@@ -95,7 +130,12 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
                       .aclk(aclk),
                       .dat_i(dat_i),
                       .dat_o(L1_data));
+    
     // The L1 trigger now has the trigger chain factored out
+    wire [47:0] mask;
+    wire [1:0] mask_wr;
+    wire mask_update;
+    wire mask_reset;
     L1_trigger_v2 
                #(   .WBCLKTYPE(WBCLKTYPE),
                     .CLKTYPE(CLKTYPE),
@@ -105,9 +145,16 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
             .wb_clk_i(wb_clk_i),
             .wb_rst_i(wb_rst_i),
             `CONNECT_WBS_IFM( wb_ , thresh_ ),
+            
+            .mask_o(mask),
+            .mask_wr_o(mask_wr),
+            .mask_update_o(mask_update),
+            .mask_rst_o(mask_reset),
+            
             .aclk(aclk),
-
-            .dat_i(L1_data),            
+            .dat_i(L1_data),
+            
+            .ifclk(ifclk),
             .trigger_o(trigger));
 
    // and now the trig gen
