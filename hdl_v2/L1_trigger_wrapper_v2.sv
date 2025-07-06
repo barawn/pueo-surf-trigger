@@ -54,6 +54,60 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
     wbs_dummy #(.ADDRESS_WIDTH(13),.DATA_WIDTH(32))
         u_dummy(`CONNECT_WBS_IFM( wb_ , spare_ ));
 
+    // now we need a register core for the thresholds and generator.
+    // interface to the L1
+    // loop control
+    wire loop_enable;
+    wire reset_complete;
+    wire [1:0] loop_state_req;
+    wire [1:0] loop_state;
+    // params
+    wire [15:0] target_rate;
+    wire [31:0] target_delta;
+    // scaler data
+    wire [31:0] scal_data;
+    // beam index for both scalers and threshold
+    wire [5:0]  beam_idx;
+    // thresholds
+    wire [17:0] new_thresh_dat;
+    wire [17:0] thresh_dat;
+    wire thresh_update;
+    wire thresh_wr;
+    wire thresh_ack;
+    
+    // I dunno about these two
+    wire first_reset;
+    wire agc_reset;
+    // register core
+    L1_register_core #(.WBCLKTYPE(WBCLKTYPE),
+                       .TARGET_DEFAULT(TARGET_DEFAULT),
+                       .DELTA_DEFAULT(DELTA_DEFAULT))
+            u_levelone_regs(.wb_clk_i(wb_clk_i),
+                            `CONNECT_WBS_IFM( wb_ , thresh_ ),
+                            .loop_enable_o(loop_enable),
+                            .reset_complete_i(reset_complete),
+                            .loop_state_req_o(loop_state_req),
+                            .loop_state_i(loop_state),
+                            
+                            .target_rate_o(target_rate),
+                            .target_delta_o(target_delta),
+                            
+                            .scal_dat_i(scal_data),
+                            .beam_idx_o(beam_idx),
+                            
+                            .thresh_dat_i(thresh_dat),
+                            .thresh_dat_o(new_thresh_dat),
+                            .thresh_update_o(thresh_update),
+                            .thresh_wr_o(thresh_wr),
+                            .thresh_ack_i(thresh_ack),
+                            
+                            .mask_o(mask),
+                            .mask_wr_o(mask_wr),
+                            .mask_update_o(mask_update),
+                            .mask_rst_o(mask_reset),
+                            
+                            .first_reset_o(first_reset),
+                            .agc_reset_o(agc_reset));
                                                    
 
     // trigger chain wrapper takes the agc and biquads    

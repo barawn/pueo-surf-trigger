@@ -23,7 +23,7 @@ module L1_trigger_loop #(parameter WBCLKTYPE = "NONE",
         input [15:0] target_delta_i,
         
         // manual threshold update interface and readback
-        input [31:0] thresh_dat_i,
+        input [17:0] thresh_dat_i,
         input [5:0] thresh_idx_i,
         // the ack here acks both of 'em
         input thresh_upd_i,
@@ -199,7 +199,8 @@ module L1_trigger_loop #(parameter WBCLKTYPE = "NONE",
             
         case (state)
             RESET_START: if (loop_enable_i) state <= `DLYFF RESETTING;
-            RESETTING: if (beam_loop_complete) state <= `DLYFF RESET_PREP_WRITE;
+            RESETTING: if (beam_loop_complete) state <= `DLYFF THRESHOLD_BEAM_INCREMENT;
+            // is this even necessary because I WOULD ABSOLUTELY LOVE A FREE STATE
             RESET_PREP_WRITE: state <= `DLYFF THRESHOLD_WRITE;
             RESET_COMPLETE: if (loop_state_req_i != LOOP_RESET) state <= `DLYFF IDLE;
             IDLE: if (loop_state_req_i == loop_state) begin
@@ -309,6 +310,6 @@ module L1_trigger_loop #(parameter WBCLKTYPE = "NONE",
     
     assign thresh_dat_o = threshold_regs_exp[thresh_idx_i];
     // we can ack in STOP_PREP because even though it takes longer, we capture the address immediately
-    assign thresh_ack_o = (state == STOP_PREP);
+    assign thresh_ack_o = (state == STOP_PREP) || (loop_state != LOOP_STOP);
     
 endmodule

@@ -32,6 +32,4 @@ module beam_scaler_dsp #(parameter CASCADE = "FALSE")(
     // It flips our opmode Y input to {48{1'b1}} so we saturate.
     reg saturated = 0;
     
-    
-
 endmodule        
