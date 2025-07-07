@@ -8,6 +8,7 @@
 module trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
                                   parameter USE_BIQUADS = "FALSE",
                                   parameter CLKTYPE = "NONE",
+                                  parameter AGC_CONTROL = "FALSE",
                                   parameter WBCLKTYPE = "NONE")(  
 
         input wb_clk_i,
@@ -133,6 +134,7 @@ module trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
 
             trigger_chain_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
                                     .USE_BIQUADS(USE_BIQUADS),
+                                    .AGC_CONTROL(AGC_CONTROL),
                                     .WBCLKTYPE(WBCLKTYPE),.CLKTYPE(CLKTYPE))
             u_chain(
                 .wb_clk_i(wb_clk_i),

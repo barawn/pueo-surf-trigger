@@ -33,6 +33,8 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
     localparam [9:0] THRESHOLD_MASK = {10{1'b1}};
     localparam NBITS_KP = 32;
     localparam NFRAC_KP = 10;
+    
+    localparam AGC_CONTROL = "TRUE";
 
     // Pass commands not about trigger rate control loop down
     `DEFINE_WB_IF( wb_L1_submodule_ , 22, 32);
@@ -182,10 +184,12 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
         end
     endtask
 
+
+//     `define ADDR_MATCH( addr, val, mask ) ( ( addr & mask ) == (val & mask) )
     always @(posedge wb_clk_i) begin
-        mask_wr[0] <= wb_cyc_i && wb_stb_i && wb_we_i && wb_ack_o && `ADDR_MATCH(wb_adr_i[13:0], 14'h1008, 14'h3FFF);
-        mask_wr[1] <= wb_cyc_i && wb_stb_i && wb_we_i && wb_ack_o && `ADDR_MATCH(wb_adr_i[13:0], 14'h100C, 14'h3FFF);
-        mask_preupdate <= wb_dat_i[31] && wb_cyc_i && wb_stb_i && wb_we_i && wb_ack_o && `ADDR_MATCH(wb_adr_i[13:0], 14'h1008, 14'h3FFB);
+        mask_wr[0] <= (state == WRITE) && `ADDR_MATCH(wb_adr_i[13:0], 14'h1008, 14'h3FFF);
+        mask_wr[1] <= (state == WRITE) && `ADDR_MATCH(wb_adr_i[13:0], 14'h100C, 14'h3FFF);
+        mask_preupdate <= wb_dat_i[31] && (state == WRITE) && `ADDR_MATCH(wb_adr_i[13:0], 14'h1008, 14'h3FFB);
         mask_update <= mask_preupdate;
         
         if (wb_rst_i) begin // Reset everything
@@ -467,6 +471,7 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
     L1_trigger #(   .AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS), 
                     .USE_BIQUADS(USE_BIQUADS),
                     .WBCLKTYPE(WBCLKTYPE),
+                    .AGC_CONTROL(AGC_CONTROL),
                     .CLKTYPE(CLKTYPE),
                     .TRIGGER_CLOCKS(TRIGGER_CLOCKS),
                     .NBEAMS(NBEAMS))

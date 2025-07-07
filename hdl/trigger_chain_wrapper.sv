@@ -16,7 +16,8 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                                 parameter STARTING_SCALE_DELTA = 30,
                                 parameter STARTING_OFFSET_DELTA = 25,
                                 parameter WBCLKTYPE = "PSCLK",
-                                parameter CLKTYPE = "ACLK")(  
+                                parameter CLKTYPE = "ACLK",
+                                parameter AGC_CONTROL = "FALSE")(  
 
 
         input wb_clk_i,
@@ -38,7 +39,6 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
     );
 
     localparam FILTER_TYPE = "HDL";
-    localparam AGC_CONTROL = "FALSE";
 
     // QUALITY OF LIFE FUNCTIONS
 
