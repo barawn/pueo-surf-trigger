@@ -43,7 +43,7 @@ def convert_beams_to_verilog_arrays(infilename = "L1Beams.csv", outfilename = "L
                     break
                 # Making it here means there is data
                 if(not first):
-                   outfile.write(", \\ // Beam %s"%(beam_idx-1))
+                   outfile.write(", \\")
                 else:
                     # outfile.write(", \\ // Beam %s"%beam_idx)
                     first = False
@@ -58,7 +58,7 @@ def convert_beams_to_verilog_arrays(infilename = "L1Beams.csv", outfilename = "L
                         outfile.write(",")
                     # outfile.write(" ")
                 outfile.write("}")
-            outfile.write(" \\ // Beam %s\n}\n"%(beam_idx))
+            outfile.write(" \\\n}\n")
             outfile.write("`define BEAM_TOTAL {:d}\n".format(beam_idx))
             if not lead_antennas is None:
                 for antenna_idx in lead_antennas:
