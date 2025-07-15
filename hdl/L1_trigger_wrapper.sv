@@ -4,7 +4,9 @@
 `define DLYFF #0.1
 `define STARTTHRESH 18'd4500
 
-module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
+module L1_trigger_wrapper #(parameter NBEAMS=2, 
+                            localparam ZERO_IS_FAKE = (NBEAMS == 2) ? "TRUE" : "FALSE",
+                    parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
                     parameter USE_BIQUADS = "FALSE",
                     parameter WBCLKTYPE = "PSCLK", parameter CLKTYPE = "ACLK",
                     parameter [47:0] TRIGGER_CLOCKS=375000000*10,// at 375 MHz this will count for 10 seconds  
@@ -472,6 +474,7 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
                     .USE_BIQUADS(USE_BIQUADS),
                     .WBCLKTYPE(WBCLKTYPE),
                     .AGC_CONTROL(AGC_CONTROL),
+                    .ZERO_IS_FAKE(ZERO_IS_FAKE),
                     .CLKTYPE(CLKTYPE),
                     .TRIGGER_CLOCKS(TRIGGER_CLOCKS),
                     .NBEAMS(NBEAMS))

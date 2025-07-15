@@ -7,7 +7,9 @@
 // 1) Shannon-Whitaker low pass filter
 // 2) Two Biquads in serial (to be used as notches)
 // 3) AGC and 12->5 bit conversion
-module L1_trigger #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
+module L1_trigger #(parameter NBEAMS=2, 
+                    parameter ZERO_IS_FAKE="FALSE",
+                    parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
                     parameter USE_BIQUADS = "FALSE",
                     parameter WBCLKTYPE = "PSCLK", parameter CLKTYPE = "ACLK",
                     parameter AGC_CONTROL = "FALSE",
@@ -288,6 +290,7 @@ module L1_trigger #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTION_BITS =
     endgenerate
 
     beamform_trigger #(.NBEAMS(NBEAMS),
+                       .ZERO_IS_FAKE(ZERO_IS_FAKE),
                        .WBCLKTYPE(WBCLKTYPE),
                        .CLKTYPE(CLKTYPE)) 
         u_trigger(
