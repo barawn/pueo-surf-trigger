@@ -1,0 +1,200 @@
+`timescale 1ns / 1ps
+module beamscaler_wrap #(parameter NBEAMS = 2,
+                         localparam NSCALERS = 2,
+                         parameter TIME_COUNT = 100000000,
+                         parameter IFCLKTYPE = "NONE",
+                         parameter WBCLKTYPE = "NONE")(
+                         
+                         input ifclk_i,
+                         input [NBEAMS*NSCALERS-1:0] count_i,
+                         output done_o,
+                         
+                         input wb_clk_i,
+                         // 96 scalers needs 7 bit addr
+                         input [6:0] scal_adr_i,
+                         output [11:0] scal_dat_o);
+
+    localparam NDUALBEAMS = (NBEAMS/2) + (NBEAMS%2);    
+    
+    // we will do sleaze, and the input will be
+    // i/2 and the output will be (i/2+1)%NDUALBEAMS.
+    // This actually loops it around but the first beamscaler
+    // doesn't connect its input, so it doesn't matter.
+    wire [NDUALBEAMS-1:0][48*2-1:0] cascade;
+    wire [1:0][47:0] final_out;
+    reg [23:0] dsp_capture_A = {24{1'b0}};
+    reg [23:0] dsp_capture_B = {24{1'b0}};
+    // no matter what we don't have to worry about missing anything here:
+    // the A:B inputs are always clocked in, it's only the P registers that won't get clocked.
+    // so even if wb_clk_ce goes in PREP_B (so it's in A:B in COMPUTE_A_0) it won't get added
+    // to A, but it will get added to B since B's P register gets enabled in COMPUTE_A_0.
+    localparam FSM_BITS = 5;                        // state    state_ce    dsp_ce  rstp wra    wrb
+    localparam [FSM_BITS-1:0] RESET = 0;            // XXX      00          00      1    0      0
+    localparam [FSM_BITS-1:0] RESET_PREP_A  = 1;    // 010      01          00      0    0      0
+    localparam [FSM_BITS-1:0] IDLE_A = 2;           // XXX      00          01      0    0      0
+    localparam [FSM_BITS-1:0] PREP_B = 3;           // 010      10          01      0    0      0
+    localparam [FSM_BITS-1:0] COMPUTE_A_0 = 4;      // 111      01          10      0    0      0
+    localparam [FSM_BITS-1:0] COMPUTE_A_1 = 5;      // XXX      00          11      0    0      0
+    localparam [FSM_BITS-1:0] DATA_SHIFT_A = 6;     // 001      01          10      0    ->1    0
+    localparam [FSM_BITS-1:0] DSP_SHIFT_A = 7;      // XXX      00          11      0    ->1    0
+    localparam [FSM_BITS-1:0] IDLE_B = 8;           // XXX      00          10      0    
+    localparam [FSM_BITS-1:0] PREP_A = 9;           // 010      01          10      0
+    localparam [FSM_BITS-1:0] COMPUTE_B_0 = 10;     // 111      10          01
+    localparam [FSM_BITS-1:0] COMPUTE_B_1 = 11;     // XXX      00          11
+    localparam [FSM_BITS-1:0] DATA_SHIFT_B = 12;    // 001      10          01
+    localparam [FSM_BITS-1:0] DSP_SHIFT_B = 13;     // XXX      00          11
+    reg [FSM_BITS-1:0] state = RESET;
+    
+    // 128 possible addresses. On the write side
+    // we have 512 x 72, but really 512 x 64.
+    // We write 2x16 per clock, and the byte enables select which bank is being updated.
+    // On the read side, the active read bank is the low address.
+    reg [7:0] scaler_addr = {8{1'b0}};
+    reg active_write_bank = 0;
+        
+    // this is combinatoric, it's easier to let Vivado
+    // recode the FSM state as needed
+    reg [2:0] beamscaler_state;
+    wire [1:0] beamscaler_state_ce;
+    reg [1:0] beamscaler_ce = 2'b00;
+    assign beamscaler_state_ce[0] = (state == RESET_PREP_A) ||
+                                    (state == PREP_A)       ||
+                                    (state == COMPUTE_A_0)  ||
+                                    (state == DATA_SHIFT_A);
+    assign beamscaler_state_ce[1] = (state == PREP_B)       ||
+                                    (state == COMPUTE_B_0)  ||
+                                    (state == DATA_SHIFT_B);
+    wire beamscaler_reset = (state == RESET);                                    
+    
+    always @(*) begin
+        (* full_case *)
+        case (state)
+            RESET_PREP_A: beamscaler_state <= 3'b010;
+            PREP_B: beamscaler_state <= 3'b010;
+            PREP_A: beamscaler_state <= 3'b010;
+            COMPUTE_A_0: beamscaler_state <= 3'b111;
+            COMPUTE_B_0: beamscaler_state <= 3'b111;
+            DATA_SHIFT_A: beamscaler_state <= 3'b001;
+            DATA_SHIFT_B: beamscaler_state <= 3'b001;
+        endcase
+    end
+
+    (* USE_DSP = "YES" *)
+    reg [47:0] timer = {48{1'b0}};
+        
+    reg timer_complete = 0;
+    
+    always @(posedge wb_clk_i) begin
+        if (timer_complete|| state == RESET || state == RESET_PREP_A)
+            timer <= {48{1'b0}};
+        else
+            timer <= timer + 1;
+        
+        timer_complete <= (timer == TIME_COUNT);
+        
+        // just transition at the idle points. The read banks are the opposite
+        // of this.
+        if (state == IDLE_A) active_write_bank <= 0;
+        else if (state == IDLE_B) active_write_bank <= 1;
+        
+        if (state == IDLE_A || state == IDLE_B)
+            scaler_addr <= NDUALBEAMS-1;
+        else if (state == DSP_SHIFT_A || state == DSP_SHIFT_B)
+            scaler_addr <= scaler_addr[6:0] - 1;
+            
+        case (state)
+            RESET:  state <= RESET_PREP_A;
+            RESET_PREP_A: state <= IDLE_A;
+            IDLE_A: if (timer_complete) state <= PREP_B;
+            PREP_B: state <= COMPUTE_A_0;
+            COMPUTE_A_0: state <= COMPUTE_A_1;
+            COMPUTE_A_1: state <= DATA_SHIFT_A;
+            DATA_SHIFT_A: if (scaler_addr[7]) state <= IDLE_B;
+                          else state <= DSP_SHIFT_A;
+            DSP_SHIFT_A: state <= DATA_SHIFT_A;
+            IDLE_B: if (timer_complete) state <= PREP_A;
+            PREP_A: state <= COMPUTE_B_0;
+            COMPUTE_B_0: state <= COMPUTE_B_1;
+            COMPUTE_B_1: state <= DATA_SHIFT_B;
+            DATA_SHIFT_B: if (scaler_addr[7]) state <= IDLE_A;
+                          else state <= DSP_SHIFT_B;
+            DSP_SHIFT_B: state <= DATA_SHIFT_B;
+        endcase
+    // the CE logic might be easier as an on/off:
+    // -> 1 in RESET_PREP_A or PREP_A or COMPUTE_A_0 or DATA_SHIFT_A
+    // -> 0 in PREP_B or COMPUTE_A_1 or DSP_SHIFT_A or IDLE_B (to catch the exit) or RESET
+        if (state == PREP_B || state == COMPUTE_A_1 || 
+            state == DSP_SHIFT_A || state == IDLE_B || state == RESET)
+            beamscaler_ce[0] <= 0;
+        else if (state == RESET_PREP_A || state == PREP_A || state == COMPUTE_A_0 || state == DATA_SHIFT_A)
+            beamscaler_ce[0] <= 1;
+
+        if (state == PREP_A || state == COMPUTE_B_1 ||
+            state == DSP_SHIFT_B || state == IDLE_A || state == RESET)
+            beamscaler_ce[1] <= 0;
+        else if (state == PREP_B || state == COMPUTE_B_0 || state == DATA_SHIFT_B)
+            beamscaler_ce[1] <= 1;            
+        
+        if (state == DATA_SHIFT_A) dsp_capture_A <= final_out[0][23:0];
+        else if (state == DSP_SHIFT_A) dsp_capture_A <= final_out[0][47:24];
+        
+        if (state == DATA_SHIFT_B) dsp_capture_B <= final_out[1][23:0];
+        else if (state == DSP_SHIFT_B) dsp_capture_B <= final_out[1][47:24];
+    end        
+
+    wire ifclk_ce;
+    wire wbclk_ce;
+    
+    // check this we might need to expand it
+    clk_div_ce #(.CLK_DIVIDE(3)) u_ce_gen(.clk(ifclk_i),
+                                          .ce(ifclk_ce));
+    flag_sync u_ce_sync(.in_clkA(ifclk_ce),.out_clkB(wbclk_ce),
+                        .clkA(ifclk_i),.clkB(wb_clk_i));                 
+
+    generate
+        genvar i;
+        // we need NDUALBEAMS beamscalers.
+        for (i=0;i<NBEAMS;i=i+2) begin : BSC
+            localparam DUALIDX = i/2;            
+            // if we have 5 beams for instance
+            // count_i is 9:0
+            // NDUALBEAMS = 2
+            // at i=0 we grab [1:0] for [1:0]
+            // at i=0 we grab [3:2] for [3:2]
+            // at i=2 we grab [5:4] for [1:0]   2*i +: 2
+            // at i=2 we grab [7:6] for [3:2]   2*i+2 +: 2
+            // at i=4 we grab [9:8] for [1:0]   2*i +: 2
+            // at i=4 we insert 00 for  [3:2]
+            // so the base grab is 2*i      for scaler 0
+            //                     2*i+2    for scaler 1
+            // except if not (i+1) < NBEAMS we grab 00
+            wire [3:0] count_in;
+            wire [48*2-1:0] dsp_out;
+            assign count_in[1:0] = count_i[2*i +: 2];
+            if (i+1 < NBEAMS) begin : RL
+                assign count_in[3:2] = count_i[2*i+2 +: 2];
+            end else begin : FK
+                assign count_in[3:2] = 2'b00;
+            end                    
+            beamscaler #(.CASCADE(i==0 ? "FALSE" : "TRUE"),
+                         .IFCLKTYPE(IFCLKTYPE),
+                         .WBCLKTYPE(WBCLKTYPE))
+                u_scaler(.ifclk_i(ifclk_i),
+                         .ifclk_ce_i(ifclk_ce),
+                         .count_i(count_in),
+                         .wb_clk_i(wb_clk_i),
+                         .wb_clk_ce_i(wb_clk_ce),
+                         .state_i( beamscaler_state ),
+                         .state_ce_i( beamscaler_state_ce ),
+                         .dsp_ce_i( beamscaler_ce ),
+                         .rstp_i(beamscaler_reset),
+                         .pc_i(cascade[DUALIDX]),
+                         .pc_o(cascade[(DUALIDX+1)%NDUALBEAMS]),
+                         .count_o(dsp_out));
+            if (i+2 >= NBEAMS) begin : FINAL
+                assign final_out = dsp_out;
+            end
+        end
+    endgenerate
+endmodule
+                         
