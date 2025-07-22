@@ -6,6 +6,7 @@
 
 module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
                     parameter USE_BIQUADS = "FALSE",
+                    parameter HDL_FILTER_VERSION = "DEFAULT",
                     parameter WBCLKTYPE = "PSCLK", parameter CLKTYPE = "ACLK",
                     parameter [47:0] TRIGGER_CLOCKS=375000000*10,// at 375 MHz this will count for 10 seconds  
                     parameter HOLDOFF_CLOCKS=16,        // NOTE: Parameters are 32 bit max, which this exceeds
@@ -466,6 +467,7 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
 
     L1_trigger #(   .AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS), 
                     .USE_BIQUADS(USE_BIQUADS),
+                    .HDL_FILTER_VERSION(HDL_FILTER_VERSION),
                     .WBCLKTYPE(WBCLKTYPE),
                     .CLKTYPE(CLKTYPE),
                     .TRIGGER_CLOCKS(TRIGGER_CLOCKS),

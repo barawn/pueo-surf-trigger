@@ -10,6 +10,7 @@
 // 3) AGC and 12->5 bit conversion
 module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                                 parameter USE_BIQUADS = "FALSE",
+                                parameter HDL_FILTER_VERSION = "DEFAULT",
                                 parameter TARGET_RMS_SQUARED = 16,
                                 parameter RMS_SQUARE_SCALE_ERR = 0,
                                 parameter OFFSET_ERR = 5,
@@ -460,10 +461,23 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                            .m_axis_data_tdata(exp_out),
                            .aclk(aclk));
         end else begin : H
-            shannon_whitaker_lpfull_v2 
-                u_lpf (  .clk_i(aclk),
-                         .in_i(dat_i),
-                         .out_o(lpf_out));
+            if (HDL_FILTER_VERSION == "SYSTOLIC") begin : S
+                wire [7:0][12:0] lpf_out_tmp;
+                shannon_whitaker_lpfull_v3
+                    u_lpf( .clk_i(aclk),
+                           .rst_i(1'b0),
+                           .dat_i(dat_i),
+                           .dat_o(lpf_out_tmp));
+                genvar ii;
+                for (ii=0;ii<8;ii=ii+1) begin : LP
+                    assign lpf_out[12*ii +: 12] = lpf_out_tmp[ii][11:0];
+                end                           
+            end else begin : D                           
+                shannon_whitaker_lpfull_v2 
+                    u_lpf (  .clk_i(aclk),
+                             .in_i(dat_i),
+                             .out_o(lpf_out));
+            end
         end
     endgenerate
     // Matched Filter
