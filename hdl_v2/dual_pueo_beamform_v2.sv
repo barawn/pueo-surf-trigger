@@ -10,15 +10,17 @@
 module dual_pueo_beamform_v2
                       #(parameter WBCLKTYPE = "NONE", 
                         parameter CLKTYPE = "NONE",
+                        parameter INTYPE = "RAW",
                         // thank you, SystemVerilog 2009
                         localparam NBITS=5,
                         localparam NSAMP=8,
                         localparam NCHAN=8,
+                        localparam INBITS = (INTYPE == "RAW") ? NCHAN*NSAMP*NBITS : 3*NSAMP*(NBITS+2),
                         localparam OUTBITS=14
                         ) (
         input clk_i,
-        input [NCHAN*NSAMP*NBITS-1:0] beamA_i,
-        input [NCHAN*NSAMP*NBITS-1:0] beamB_i,
+        input [INBITS-1:0] beamA_i,
+        input [INBITS-1:0] beamB_i,
 
         output [NSAMP*(NBITS+3)-1:0] outA_o,
         output [NSAMP*(NBITS+3)-1:0] outB_o,
@@ -27,13 +29,6 @@ module dual_pueo_beamform_v2
         output [NSAMP*OUTBITS-1:0] sq_outB_o
     );
      
-    // Registers for pipelining
-    reg [NCHAN*NSAMP*NBITS-1:0] beamA_i_reg = {NCHAN*NSAMP*NBITS{1'b0}};
-    reg [NCHAN*NSAMP*NBITS-1:0] beamB_i_reg = {NCHAN*NSAMP*NBITS{1'b0}};
-    
-    // vectorize inputs
-    wire [NBITS-1:0] beamA_vec[NCHAN-1:0][NSAMP-1:0];
-    wire [NBITS-1:0] beamB_vec[NCHAN-1:0][NSAMP-1:0];
     // create the beams.
     wire [NBITS+2:0] beamA[NSAMP-1:0];
     wire [NBITS+2:0] beamB[NSAMP-1:0];
@@ -44,60 +39,82 @@ module dual_pueo_beamform_v2
     wire [14:0] beamA_sqout[NSAMP-1:0];
     wire [14:0] beamB_sqout[NSAMP-1:0];
 
-    // sum of [7:4] and [3:0]
-    wire [15:0] beamA_sum74;
-    wire [15:0] beamA_sum30;
-    wire [15:0] beamB_sum74;
-    wire [15:0] beamB_sum30;
-
-    always @(posedge clk_i) begin
-        // Pipeline the inputs
-        beamA_i_reg <= beamA_i;
-        beamB_i_reg <= beamB_i;
-    end
-
     generate
         genvar ii,jj,kk;
+        if (INTYPE == "RAW") begin : RAWIN
+            // Registers for pipelining
+            reg [NCHAN*NSAMP*NBITS-1:0] beamA_i_reg = {NCHAN*NSAMP*NBITS{1'b0}};
+            reg [NCHAN*NSAMP*NBITS-1:0] beamB_i_reg = {NCHAN*NSAMP*NBITS{1'b0}};
+            
+            always @(posedge clk_i) begin : RR
+                beamA_i_reg <= beamA_i;
+                beamB_i_reg <= beamB_i;
+            end
+        end
         // sample loop is the outer b/c once we beamform the channels disappear
         for (jj=0;jj<NSAMP;jj=jj+1) begin : SV
-            // // absolute value. this is actually going from *offset binary* to abs
-            // reg [NBITS+1:0] beamA_abs = {NBITS+2{1'b0}};
-            // reg [NBITS+1:0] beamB_abs = {NBITS+2{1'b0}};
-            // uh... let's see if this is needed or not
-            wire [NBITS+1:0] zero = {NBITS+2{1'b0}};
-            for (ii=0;ii<NCHAN;ii=ii+1) begin : CV
-                // channels jump by NSAMP*NBITS. also flip to offset binary
-                assign beamA_vec[ii][jj] = beamA_i_reg[NBITS*NSAMP*ii + NBITS*jj +: NBITS]; //L Changed from Patrick's version
-                assign beamB_vec[ii][jj] = beamB_i_reg[NBITS*NSAMP*ii + NBITS*jj +: NBITS];
+            // We have 2 separate input types: either we're given the raw inputs (8 channels, 8 samples, 5 bits each)
+            // or a selection of postadder inputs (3 adders, 8 samples, 7 bits each).
+            // The postadder input version fixes Vivado's lack of resource sharing detection.
+            if (INTYPE == "RAW") begin : RAWIN
+                wire [NBITS+1:0] zero = {NBITS+2{1'b0}};
+                for (ii=0;ii<NCHAN;ii=ii+1) begin : CV
+                    // channels jump by NSAMP*NBITS. also flip to offset binary
+                    assign beamA_vec[ii][jj] = beamA_i_reg[NBITS*NSAMP*ii + NBITS*jj +: NBITS]; //L Changed from Patrick's version
+                    assign beamB_vec[ii][jj] = beamB_i_reg[NBITS*NSAMP*ii + NBITS*jj +: NBITS];
+                end
+    
+                // First beamforming step is to sum at each (variously delayed) 3 GHz clock tick
+    
+                // beamform A
+                fivebit_8way_ternary #(.ADD_CONSTANT(5'd4)) // The constant add is to correct for the -0.5 in symmetric rep
+                    u_beamA(.clk_i(clk_i),
+                            .A(beamA_vec[0][jj]),
+                            .B(beamA_vec[1][jj]),
+                            .C(beamA_vec[2][jj]),
+                            .D(beamA_vec[3][jj]),
+                            .E(beamA_vec[4][jj]),
+                            .F(beamA_vec[5][jj]),
+                            .G(beamA_vec[6][jj]),
+                            .H(beamA_vec[7][jj]),
+                            .O(beamA[jj])); // Sum of the delayed beams for each (phase offset) sample
+                // beamform B
+                fivebit_8way_ternary #(.ADD_CONSTANT(5'd4)) // The constant add is to correct for the -0.5 in symmetric rep
+                    u_beamB(.clk_i(clk_i),
+                            .A(beamB_vec[0][jj]),
+                            .B(beamB_vec[1][jj]),
+                            .C(beamB_vec[2][jj]),
+                            .D(beamB_vec[3][jj]),
+                            .E(beamB_vec[4][jj]),
+                            .F(beamB_vec[5][jj]),
+                            .G(beamB_vec[6][jj]),
+                            .H(beamB_vec[7][jj]),
+                            .O(beamB[jj])); // Sum of the delayed beams for each (phase offset) sample
+            end else begin : PAIN
+                // The postadd version doesn't need pipeline regs.
+                wire [2:0][(NBITS+2)-1:0] A_stage1 = beamA_i;
+                wire [2:0][(NBITS+2)-1:0] B_stage1 = beamB_i;
+                
+                ternary_add_sub_prim #(.input_word_size(NBITS+2),
+                                       .is_signed(1'b0))
+                    u_stage2A(.clk_i(clk_i),
+                              .rst_i(1'b0),
+                              .x_i(A_stage1[0]),
+                              .y_i(A_stage1[1]),
+                              .z_i(A_stage1[2]),
+                              .sum_o( beamA[jj] ));
+                ternary_add_sub_prim #(.input_word_size(NBITS+2),
+                                       .is_signed(1'b0))
+                    u_stage2B(.clk_i(clk_i),
+                              .rst_i(1'b0),
+                              .x_i(B_stage1[0]),
+                              .y_i(B_stage1[1]),
+                              .z_i(B_stage1[2]),
+                              .sum_o( beamB[jj] ));                                                                     
             end
-
-            // First beamforming step is to sum at each (variously delayed) 3 GHz clock tick
-
-            // beamform A
-            fivebit_8way_ternary #(.ADD_CONSTANT(5'd4)) // The constant add is to correct for the -0.5 in symmetric rep
-                u_beamA(.clk_i(clk_i),
-                        .A(beamA_vec[0][jj]),
-                        .B(beamA_vec[1][jj]),
-                        .C(beamA_vec[2][jj]),
-                        .D(beamA_vec[3][jj]),
-                        .E(beamA_vec[4][jj]),
-                        .F(beamA_vec[5][jj]),
-                        .G(beamA_vec[6][jj]),
-                        .H(beamA_vec[7][jj]),
-                        .O(beamA[jj])); // Sum of the delayed beams for each (phase offset) sample
-            // beamform B
-            fivebit_8way_ternary #(.ADD_CONSTANT(5'd4)) // The constant add is to correct for the -0.5 in symmetric rep
-                u_beamB(.clk_i(clk_i),
-                        .A(beamB_vec[0][jj]),
-                        .B(beamB_vec[1][jj]),
-                        .C(beamB_vec[2][jj]),
-                        .D(beamB_vec[3][jj]),
-                        .E(beamB_vec[4][jj]),
-                        .F(beamB_vec[5][jj]),
-                        .G(beamB_vec[6][jj]),
-                        .H(beamB_vec[7][jj]),
-                        .O(beamB[jj])); // Sum of the delayed beams for each (phase offset) sample
-
+            
+            // And then everything else after that is common.
+            
             // Flip the top bit, reverting from offset binary to two's complement.
             assign beamA_signed[jj] = {!beamA[jj][NBITS+2], beamA[jj][NBITS+1:0]};
             assign beamB_signed[jj] = {!beamB[jj][NBITS+2], beamB[jj][NBITS+1:0]};
