@@ -154,31 +154,29 @@ module dual_pueo_envelope_v2 #(localparam NBITS=14,
 
     // This is an annoying quirk in HDL - you can't really get the carry of a subtract
     // operation, so pipelining it is a giant disaster. 
-    // Timing wise what we end up wanting is "use lowbitz^-1" but recall that
-    // you think the carry from a < b gets you 1 if (a-b) < 0 (meaning b >= a),
-    // but the carry actually gets you not that value:
-    // e.g. if a is 3 and b is 1, you have 011 + 110 + 1 = 1010.
-    // e.g. the carry from a - b gets you a >= b.
-    // so we want a = lowbitz^-1 and b = lowbit
 
     // Since we can't actually use the subtractor due to HDL quirkiness, we have to do
     // the math ourselves.
     
-    wire [3:0] lowbit_store74_diffA = {1'b0, lowbit_store74_A} + {1'b0, lowbit74_A} + 1'b1;
+    wire [3:0] lowbit_store74_diffA = {1'b0, lowbit74_A} + {1'b0, ~lowbit_store74_A} + 1'b1;
     reg lowbit_carryA = 0;
     reg lowbit_store_carryA = 0;
-    wire [3:0] lowbit_store74_diffB = {1'b0, lowbit_store74_B} + {1'b0, ~lowbit74_B} + 1'b1;    
+    
+    wire [3:0] lowbit_store74_diffB = {1'b0, lowbit74_B} + {1'b0, ~lowbit_store74_B} + 1'b1;    
     reg lowbit_carryB = 0;
     reg lowbit_store_carryB = 0;
         
     reg [12:0] sum74_storeA = {13{1'b0}};
     wire [12:0] sum74_A = {test_carry[1], dsp_out[1]};
-    wire [13:0] sum74_diffA = {1'b0,sum74_storeA} + {1'b1,~sum74_A} + lowbit_store_carryA;
-    reg use_zminus1_A= 0;
+    wire [13:0] sum74_diffA = {1'b0,sum74_A} + {1'b1,~sum74_storeA} + lowbit_store_carryA;
+    reg use_undelayed_A = 0;
+    reg use_undelayed_A_store = 0;
+
     reg [12:0] sum74_storeB = {13{1'b0}};
     wire [12:0] sum74_B = {test_carry[3], dsp_out[3]};
-    wire [13:0] sum74_diffB = {1'b0,sum74_storeB} + {1'b1,~sum74_B} + lowbit_store_carryB;
-    reg use_zminus1_B = 0;
+    wire [13:0] sum74_diffB = {1'b0,sum74_B} + {1'b1,~sum74_storeB} + lowbit_store_carryB;
+    reg use_undelayed_B = 0;
+    reg use_undelayed_B_store = 0;
         
     wire [13:0] sum30_A = {test_carry[0], dsp_out[0]};
     wire [13:0] sum30_B = {test_carry[2], dsp_out[2]};    
@@ -211,9 +209,11 @@ module dual_pueo_envelope_v2 #(localparam NBITS=14,
         sum74_storeA <= sum74_A;
         sum74_storeB <= sum74_B;
         
-        use_zminus1_A <= sum74_diffA[13];
-        use_zminus1_B <= sum74_diffB[13];
-
+        use_undelayed_A <= sum74_diffA[13];
+        use_undelayed_A_store <= use_undelayed_A;
+        use_undelayed_B <= sum74_diffB[13];
+        use_undelayed_B_store <= use_undelayed_B;
+        
         sum30_A_shreg[0] <= sum30_A;
         sum30_A_shreg[1] <= sum30_A_shreg[0];
 
@@ -239,26 +239,26 @@ module dual_pueo_envelope_v2 #(localparam NBITS=14,
     srlvec #(.NBITS(13))
         u_sum74_dlyA(.clk(clk_i),
                      .ce(1'b1),
-                     .a( { 3'b000, use_zminus1_A}),
+                     .a( { 3'b000, use_undelayed_A_store}),
                      .din( sum74_storeA ),
                      .dout(sq_sum74_A[15:3]));
     srlvec #(.NBITS(3))
         u_lb74_dlyA(.clk(clk_i),
                     .ce(1'b1),
-                    .a( { 3'b001, use_zminus1_A}),
+                    .a( { 3'b001, use_undelayed_A_store}),
                     .din( lowbit_store74_A ),
                     .dout(sq_sum74_A[2:0]));                     
 
     srlvec #(.NBITS(13))
         u_sum74_dlyB(.clk(clk_i),
                      .ce(1'b1),
-                     .a( { 3'b000, use_zminus1_B}),
+                     .a( { 3'b000, use_undelayed_B_store}),
                      .din( sum74_storeB ),
                      .dout(sq_sum74_B[15:3]));
     srlvec #(.NBITS(3))
         u_lb74_dlyB(.clk(clk_i),
                     .ce(1'b1),
-                    .a( { 3'b001, use_zminus1_B }),
+                    .a( { 3'b001, use_undelayed_B_store }),
                     .din( lowbit_store74_B ),
                     .dout(sq_sum74_B[2:0]));
     
