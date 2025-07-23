@@ -8,9 +8,7 @@
 // outA_o/outB_o are just there for debugging - if needed we could
 // throw them into an ILA or something.
 module dual_pueo_beamform_v2
-                      #(parameter WBCLKTYPE = "NONE", 
-                        parameter CLKTYPE = "NONE",
-                        parameter INTYPE = "RAW",
+                      #(parameter INTYPE = "RAW",
                         // thank you, SystemVerilog 2009
                         localparam NBITS=5,
                         localparam NSAMP=8,
