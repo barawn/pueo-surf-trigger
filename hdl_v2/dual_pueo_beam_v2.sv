@@ -79,6 +79,6 @@ module dual_pueo_beam_v2
                      .envelope_i( { envelopeB, envelopeA } ),
                      .trigger_o(trigger_o),
                      .ab_casc_i(thresh_casc_i),
-                     .ab_casc_o(thresh_casc_o));    
+                     .ab_casc_o(thresh_casc_o));
     
 endmodule
