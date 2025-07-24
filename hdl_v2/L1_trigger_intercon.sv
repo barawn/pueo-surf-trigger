@@ -3,18 +3,23 @@
 // the L1 trigger interconnect isn't combinatoric, it's registered
 // because we want to cut down the cost and power to get to the stuff running in ACLK.
 // we'll see.
+//
+// 46 -> 92 -> 7 address bits -> 9 real 
 module L1_trigger_intercon(
         input wb_clk_i,
         input clock_enabled_i,
         `TARGET_NAMED_PORTS_WB_IF( wb_ , 15, 32 ),
-        `HOST_NAMED_PORTS_WB_IF( thresh_ , 13, 32 ),
-        `HOST_NAMED_PORTS_WB_IF( generator_ , 13, 32 ),
+        `HOST_NAMED_PORTS_WB_IF( thresh_ , 13, 32 ),        // 0x0000 - 0x1FFF
+                                                            // 0x0000 - 0x03FF (reserved)
+                                                            // 0x0400 - 0x07FF (scalers)
+                                                            // 0x0800 - 0x0FFF (thresholds)
+        `HOST_NAMED_PORTS_WB_IF( control_ , 13, 32 ),
         `HOST_NAMED_PORTS_WB_IF( agc_ , 13, 32 ),
         `HOST_NAMED_PORTS_WB_IF( bq_ , 13, 32 ) 
     );
 
     localparam [1:0] MODULE_THRESH = 2'b00;
-    localparam [1:0] MODULE_GENERATOR = 2'b01;
+    localparam [1:0] MODULE_CONTROL = 2'b01;
     localparam [1:0] MODULE_AGC = 2'b10;
     localparam [1:0] MODULE_BQ = 2'b11;
     
@@ -26,11 +31,11 @@ module L1_trigger_intercon(
     reg [12:0]  thresh_adr = {13{1'b0}};
     reg [31:0]  thresh_dat = {32{1'b0}};
     
-    wire        generator_select = (module_select == MODULE_GENERATOR) && clock_enabled_i;
-    reg         generator_cyc = 0;
-    reg         generator_we = 0;
-    reg [12:0]  generator_adr = {13{1'b0}};
-    reg [31:0]  generator_dat = {32{1'b0}};
+    wire        control_select = (module_select == MODULE_CONTROL) && clock_enabled_i;
+    reg         control_cyc = 0;
+    reg         control_we = 0;
+    reg [12:0]  control_adr = {13{1'b0}};
+    reg [31:0]  control_dat = {32{1'b0}};
     
     
     wire        agc_select = (module_select == MODULE_AGC) && clock_enabled_i;
@@ -72,11 +77,11 @@ module L1_trigger_intercon(
         if (thresh_select && state == IDLE) thresh_adr <= wb_adr_i;
         if (thresh_select && state == IDLE) thresh_we <= wb_we_i;
         
-        if (!generator_select) generator_dat <= {32{1'b0}};
-        else if (we) generator_dat <= wb_dat_i;
-        else if (generator_ack_i) generator_dat <= generator_dat_i;
-        if (generator_select && state == IDLE) generator_adr <= wb_adr_i;
-        if (generator_select && state == IDLE) generator_we <= wb_we_i;
+        if (!control_select) control_dat <= {32{1'b0}};
+        else if (we) control_dat <= wb_dat_i;
+        else if (control_ack_i) control_dat <= control_dat_i;
+        if (control_select && state == IDLE) control_adr <= wb_adr_i;
+        if (control_select && state == IDLE) control_we <= wb_we_i;
                 
         if (!agc_select) agc_dat <= {32{1'b0}};
         else if (we) agc_dat <= wb_dat_i;
@@ -92,8 +97,8 @@ module L1_trigger_intercon(
         if (bq_select && state == IDLE) bq_we <= wb_we_i;
 
         // wanna see something cool
-        mux_up_dat <= thresh_dat | generator_dat | agc_dat | bq_dat;
-        mux_up_ack <= thresh_ack_i | generator_ack_i | agc_ack_i | bq_ack_i | no_ack;
+        mux_up_dat <= thresh_dat | control_dat | agc_dat | bq_dat;
+        mux_up_ack <= thresh_ack_i | control_ack_i | agc_ack_i | bq_ack_i | no_ack;
 
         if (wb_cyc_i && state == IDLE)
             module_select <= wb_adr_i[14:13];
@@ -110,8 +115,8 @@ module L1_trigger_intercon(
         if (thresh_ack_i) thresh_cyc <= 0;
         else if (state == TRANSACTION && thresh_select) thresh_cyc <= 1;
         
-        if (generator_ack_i) generator_cyc <= 0;
-        else if (state == TRANSACTION && generator_select) generator_cyc <= 1;
+        if (control_ack_i) control_cyc <= 0;
+        else if (state == TRANSACTION && control_select) control_cyc <= 1;
         
         if (agc_ack_i) agc_cyc <= 0;
         else if (state == TRANSACTION && agc_select) agc_cyc <= 1;
@@ -132,12 +137,12 @@ module L1_trigger_intercon(
     assign thresh_we_o =  thresh_we;
     assign thresh_sel_o = 4'hF;
         
-    assign generator_cyc_o = generator_cyc;
-    assign generator_stb_o = generator_cyc;
-    assign generator_adr_o = generator_adr;
-    assign generator_dat_o = generator_dat;
-    assign generator_we_o = generator_we;
-    assign generator_sel_o = 4'hF;
+    assign control_cyc_o = control_cyc;
+    assign control_stb_o = control_cyc;
+    assign control_adr_o = control_adr;
+    assign control_dat_o = control_dat;
+    assign control_we_o = control_we;
+    assign control_sel_o = 4'hF;
     
     assign agc_cyc_o = agc_cyc;
     assign agc_stb_o = agc_cyc;
