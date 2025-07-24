@@ -8,13 +8,13 @@ module L1_trigger_intercon(
         input clock_enabled_i,
         `TARGET_NAMED_PORTS_WB_IF( wb_ , 15, 32 ),
         `HOST_NAMED_PORTS_WB_IF( thresh_ , 13, 32 ),
-        `HOST_NAMED_PORTS_WB_IF( scaler_ , 13, 32 ),
+        `HOST_NAMED_PORTS_WB_IF( generator_ , 13, 32 ),
         `HOST_NAMED_PORTS_WB_IF( agc_ , 13, 32 ),
         `HOST_NAMED_PORTS_WB_IF( bq_ , 13, 32 ) 
     );
 
     localparam [1:0] MODULE_THRESH = 2'b00;
-    localparam [1:0] MODULE_SCALER = 2'b01;
+    localparam [1:0] MODULE_GENERATOR = 2'b01;
     localparam [1:0] MODULE_AGC = 2'b10;
     localparam [1:0] MODULE_BQ = 2'b11;
     
@@ -26,11 +26,11 @@ module L1_trigger_intercon(
     reg [12:0]  thresh_adr = {13{1'b0}};
     reg [31:0]  thresh_dat = {32{1'b0}};
     
-    wire        scaler_select = (module_select == MODULE_SCALER) && clock_enabled_i;
-    reg         scaler_cyc = 0;
-    reg         scaler_we = 0;
-    reg [12:0]  scaler_adr = {13{1'b0}};
-    reg [31:0]  scaler_dat = {32{1'b0}};
+    wire        generator_select = (module_select == MODULE_GENERATOR) && clock_enabled_i;
+    reg         generator_cyc = 0;
+    reg         generator_we = 0;
+    reg [12:0]  generator_adr = {13{1'b0}};
+    reg [31:0]  generator_dat = {32{1'b0}};
     
     
     wire        agc_select = (module_select == MODULE_AGC) && clock_enabled_i;
@@ -72,11 +72,11 @@ module L1_trigger_intercon(
         if (thresh_select && state == IDLE) thresh_adr <= wb_adr_i;
         if (thresh_select && state == IDLE) thresh_we <= wb_we_i;
         
-        if (!scaler_select) scaler_dat <= {32{1'b0}};
-        else if (we) scaler_dat <= wb_dat_i;
-        else if (scaler_ack_i) scaler_dat <= scaler_dat_i;
-        if (scaler_select && state == IDLE) scaler_adr <= wb_adr_i;
-        if (scaler_select && state == IDLE) scaler_we <= wb_we_i;
+        if (!generator_select) generator_dat <= {32{1'b0}};
+        else if (we) generator_dat <= wb_dat_i;
+        else if (generator_ack_i) generator_dat <= generator_dat_i;
+        if (generator_select && state == IDLE) generator_adr <= wb_adr_i;
+        if (generator_select && state == IDLE) generator_we <= wb_we_i;
                 
         if (!agc_select) agc_dat <= {32{1'b0}};
         else if (we) agc_dat <= wb_dat_i;
@@ -92,8 +92,8 @@ module L1_trigger_intercon(
         if (bq_select && state == IDLE) bq_we <= wb_we_i;
 
         // wanna see something cool
-        mux_up_dat <= thresh_dat | scaler_dat | agc_dat | bq_dat;
-        mux_up_ack <= thresh_ack_i | scaler_ack_i | agc_ack_i | bq_ack_i | no_ack;
+        mux_up_dat <= thresh_dat | generator_dat | agc_dat | bq_dat;
+        mux_up_ack <= thresh_ack_i | generator_ack_i | agc_ack_i | bq_ack_i | no_ack;
 
         if (wb_cyc_i && state == IDLE)
             module_select <= wb_adr_i[14:13];
@@ -110,8 +110,8 @@ module L1_trigger_intercon(
         if (thresh_ack_i) thresh_cyc <= 0;
         else if (state == TRANSACTION && thresh_select) thresh_cyc <= 1;
         
-        if (scaler_ack_i) scaler_cyc <= 0;
-        else if (state == TRANSACTION && scaler_select) scaler_cyc <= 1;
+        if (generator_ack_i) generator_cyc <= 0;
+        else if (state == TRANSACTION && generator_select) generator_cyc <= 1;
         
         if (agc_ack_i) agc_cyc <= 0;
         else if (state == TRANSACTION && agc_select) agc_cyc <= 1;
@@ -132,12 +132,12 @@ module L1_trigger_intercon(
     assign thresh_we_o =  thresh_we;
     assign thresh_sel_o = 4'hF;
         
-    assign scaler_cyc_o = scaler_cyc;
-    assign scaler_stb_o = scaler_cyc;
-    assign scaler_adr_o = scaler_adr;
-    assign scaler_dat_o = scaler_dat;
-    assign scaler_we_o = scaler_we;
-    assign scaler_sel_o = 4'hF;
+    assign generator_cyc_o = generator_cyc;
+    assign generator_stb_o = generator_cyc;
+    assign generator_adr_o = generator_adr;
+    assign generator_dat_o = generator_dat;
+    assign generator_we_o = generator_we;
+    assign generator_sel_o = 4'hF;
     
     assign agc_cyc_o = agc_cyc;
     assign agc_stb_o = agc_cyc;
