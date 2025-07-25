@@ -12,10 +12,13 @@ module L1_trigger_intercon(
         `HOST_NAMED_PORTS_WB_IF( thresh_ , 13, 32 ),        // 0x0000 - 0x1FFF
                                                             // 0x0000 - 0x03FF (reserved)
                                                             // 0x0400 - 0x07FF (scalers)
-                                                            // 0x0800 - 0x0FFF (thresholds)
-        `HOST_NAMED_PORTS_WB_IF( control_ , 13, 32 ),
-        `HOST_NAMED_PORTS_WB_IF( agc_ , 13, 32 ),
-        `HOST_NAMED_PORTS_WB_IF( bq_ , 13, 32 ) 
+                                                            // 0x0800 - 0x0BFF (trigger thresholds)
+                                                            // 0x0C00 - 0x0FFF (trigger subthresholds)
+                                                            // 0x1000 - 0x17FF (reserved)
+                                                            // 0x1800 - 0x1FFF (threshold/scal control)
+        `HOST_NAMED_PORTS_WB_IF( control_ , 13, 32 ),       // beam masking only for now I think
+        `HOST_NAMED_PORTS_WB_IF( agc_ , 13, 32 ),           // same as before
+        `HOST_NAMED_PORTS_WB_IF( bq_ , 13, 32 )             // same as before
     );
 
     localparam [1:0] MODULE_THRESH = 2'b00;
