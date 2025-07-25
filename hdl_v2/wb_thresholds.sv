@@ -30,6 +30,7 @@
 // wb_adr_i[12] splits between control(1) and thresholds(0)
 module wb_thresholds #(parameter WBCLKTYPE = "NONE",
                        parameter ACLKTYPE = "NONE",
+                       parameter DEFAULT_COUNT = 100000000,
                        parameter NBEAMS = 46)(
         input wb_clk_i,
         `TARGET_NAMED_PORTS_WB_IF( wb_ , 12, 32 ),
@@ -43,14 +44,14 @@ module wb_thresholds #(parameter WBCLKTYPE = "NONE",
         output [1:0] thresh_update_o
     );
 
-    wire [7:0] ram_wraddr = {wb_adr_i[3 +: 6], wb_adr_i[11], wb_adr_i[2]};
+    wire [7:0] ram_wraddr = {wb_adr_i[3 +: 6], wb_adr_i[10], wb_adr_i[2]};
     wire [31:0] ram_wrdata = { {14{1'b0}}, wb_dat_i[0 +: 18] };
     wire [31:0] ram_wr_readback;
 
     wire ram_wr;
 
-    wire sel_thresholds = !wb_adr_i[12];
-    wire sel_control = wb_adr_i[12];
+    wire sel_thresholds = !wb_adr_i[11];
+    wire sel_control = wb_adr_i[11];
     // 4 control registers:
     // 0 threshold reset/update/status
     // 1 scaler status and reset
@@ -60,9 +61,9 @@ module wb_thresholds #(parameter WBCLKTYPE = "NONE",
     // 3 reserved
     wire [31:0] control_regs[3:0];        
     // only pick off [3:2] of this
-    localparam [15:0] THRESH_CONTROL = 16'h1800;
-    localparam [15:0] SCALER_CONTROL = 16'h1804;
-    localparam [15:0] SCALER_ADJUST =  16'h1808;
+    localparam [15:0] THRESH_CONTROL = 16'h1800;    // in *our* distorted space, this is 800
+    localparam [15:0] SCALER_CONTROL = 16'h1804;    // in *our* distorted space, this is 804
+    localparam [15:0] SCALER_ADJUST =  16'h1808;    // in *our* distorted space, this is 808
     
     (* CUSTOM_CC_SRC = WBCLKTYPE *)
     reg reset_update = 0;
@@ -85,17 +86,18 @@ module wb_thresholds #(parameter WBCLKTYPE = "NONE",
     reg scaler_reset = 0;
     
 
-    localparam FSM_BITS = 2;
+    localparam FSM_BITS = 3;
     localparam [FSM_BITS-1:0] IDLE = 0;
     localparam [FSM_BITS-1:0] RAM_READ = 1;
     localparam [FSM_BITS-1:0] RAM_WAIT_0 = 2;
-    localparam [FSM_BITS-1:0] ACK = 3;
+    localparam [FSM_BITS-1:0] CAPTURE = 3;
+    localparam [FSM_BITS-1:0] ACK = 4;
     reg [FSM_BITS-1:0] state = IDLE;
     
     reg [31:0] wb_dat = {32{1'b0}};
     wire [31:0] scaler_period;
 
-    wire scaler_adjust_wr = (state == ACK && sel_control && wb_adr_i[3:2] == SCALER_ADJUST[3:2]);    
+    wire scaler_adjust_wr = (state == ACK && sel_control && wb_adr_i[3:2] == SCALER_ADJUST[3:2] && wb_we_i);    
 
     assign control_regs[0] = { {30{1'b0}}, update_requested, reset_update };
     assign control_regs[1] = { {30{1'b0}}, scaler_write_bank, scaler_reset };
@@ -105,15 +107,18 @@ module wb_thresholds #(parameter WBCLKTYPE = "NONE",
     always @(posedge wb_clk_i) begin
         case (state)
             IDLE: if (wb_cyc_i && wb_stb_i) begin
-                if (!wb_we_i && sel_thresholds) state <= RAM_READ;
-                else state <= ACK;                
+                if (!wb_we_i) begin
+                    if (sel_thresholds) state <= RAM_READ;
+                    else state <= CAPTURE;
+                end else state <= ACK;                
             end
             RAM_READ: state <= RAM_WAIT_0;
-            RAM_WAIT_0: state <= ACK;
+            RAM_WAIT_0: state <= CAPTURE;
+            CAPTURE: state <= ACK;
             ACK: state <= IDLE;
         endcase
 
-        if (state == ACK) begin
+        if (state == CAPTURE) begin
             if (sel_thresholds) wb_dat <= ram_wr_readback;
             else if (sel_control) wb_dat <= control_regs[wb_adr_i[3:2]];            
         end
@@ -136,7 +141,7 @@ module wb_thresholds #(parameter WBCLKTYPE = "NONE",
         scaler_write_bank <= scal_bank_i;
     end
 
-    preset_timer #(.DEFAULT_COUNT(100000000),.WIDTH(32))
+    preset_timer #(.DEFAULT_COUNT(DEFAULT_COUNT),.WIDTH(32))
         u_scal_timer(.clk_i(wb_clk_i),
                      .rst_i(scaler_reset),
                      .max_count_i(wb_dat_i),
@@ -298,6 +303,7 @@ module wb_thresholds #(parameter WBCLKTYPE = "NONE",
     
     xpm_memory_tdpram #(.ADDR_WIDTH_A(8),
                         .ADDR_WIDTH_B(7),
+                        .CLOCKING_MODE("independent_clock"),
                         .BYTE_WRITE_WIDTH_A(32),
                         .BYTE_WRITE_WIDTH_B(64),
                         .MEMORY_SIZE(8192),
@@ -308,13 +314,18 @@ module wb_thresholds #(parameter WBCLKTYPE = "NONE",
                         .READ_LATENCY_A(2),
                         .READ_LATENCY_B(2))
                         u_thresh_ram(.clka(wb_clk_i),
+                                     .sleep(1'b0),
                                      .addra(ram_wraddr),
                                      .ena(state == ACK || state == RAM_READ),
                                      .regcea(1'b1),
                                      .rsta(1'b0),
-                                     .wea(ram_wr),
                                      .douta(ram_wr_readback),
                                      .dina(ram_wrdata),
+                                     .wea(ram_wr),
+                                     .clkb(aclk),
+                                     .regceb(1'b1),
+                                     .rstb(1'b0),
+                                     .web(1'b0),
                                      .addrb(ram_rdaddr),
                                      .enb(ram_read),
                                      .doutb(ram_out));                        
