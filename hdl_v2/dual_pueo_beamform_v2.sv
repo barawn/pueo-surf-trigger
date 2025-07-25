@@ -1,4 +1,4 @@
-`timescale 1ns / 1ps
+`timescale 1ns / 1ps    
 // Second version of the 2 beam module. This version separates out
 // EVERYTHING except the beamform and square.
 //
@@ -33,17 +33,23 @@ module dual_pueo_beamform_v2
     // converted back to signed
     wire [NBITS+2:0] beamA_signed[NSAMP-1:0];
     wire [NBITS+2:0] beamB_signed[NSAMP-1:0];
+    // actual square
+    wire [13:0] beamA_sq[NSAMP-1:0];
+    wire [13:0] beamB_sq[NSAMP-1:0];            
     // square output
     wire [14:0] beamA_sqout[NSAMP-1:0];
     wire [14:0] beamB_sqout[NSAMP-1:0];
 
+    // Registers for pipelining
+    reg [NCHAN*NSAMP*NBITS-1:0] beamA_i_reg = {NCHAN*NSAMP*NBITS{1'b0}};
+    reg [NCHAN*NSAMP*NBITS-1:0] beamB_i_reg = {NCHAN*NSAMP*NBITS{1'b0}};
+    // vectorize inputs
+    wire [NBITS-1:0] beamA_vec[NCHAN-1:0][NSAMP-1:0];
+    wire [NBITS-1:0] beamB_vec[NCHAN-1:0][NSAMP-1:0];
+
     generate
         genvar ii,jj,kk;
-        if (INTYPE == "RAW") begin : RAWIN
-            // Registers for pipelining
-            reg [NCHAN*NSAMP*NBITS-1:0] beamA_i_reg = {NCHAN*NSAMP*NBITS{1'b0}};
-            reg [NCHAN*NSAMP*NBITS-1:0] beamB_i_reg = {NCHAN*NSAMP*NBITS{1'b0}};
-            
+        if (INTYPE == "RAW") begin : RAWIN            
             always @(posedge clk_i) begin : RR
                 beamA_i_reg <= beamA_i;
                 beamB_i_reg <= beamB_i;
@@ -56,6 +62,7 @@ module dual_pueo_beamform_v2
             // The postadder input version fixes Vivado's lack of resource sharing detection.
             if (INTYPE == "RAW") begin : RAWIN
                 wire [NBITS+1:0] zero = {NBITS+2{1'b0}};
+            
                 for (ii=0;ii<NCHAN;ii=ii+1) begin : CV
                     // channels jump by NSAMP*NBITS. also flip to offset binary
                     assign beamA_vec[ii][jj] = beamA_i_reg[NBITS*NSAMP*ii + NBITS*jj +: NBITS]; //L Changed from Patrick's version
