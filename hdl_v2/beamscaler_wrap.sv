@@ -18,12 +18,12 @@
 // Who knows, though.
 module beamscaler_wrap #(parameter NBEAMS = 2,
                          localparam NSCALERS = 2,
-                         parameter TIME_COUNT = 100000000,
                          parameter IFCLKTYPE = "NONE",
                          parameter WBCLKTYPE = "NONE")(
                          
                          input ifclk_i,
                          input [NBEAMS*NSCALERS-1:0] count_i,
+                         input timer_i,
                          output done_o,
                          
                          input wb_clk_i,
@@ -31,7 +31,11 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
                          // 96 scalers needs 7 bit addr
                          input scal_rd_i,
                          input [6:0] scal_adr_i,
-                         output [31:0] scal_dat_o);
+                         output [31:0] scal_dat_o,
+                         input [31:0] scal_period_i,
+                         input        scal_period_wr_i,                        
+                         output write_bank_o
+                         );
 
     localparam NDUALBEAMS = (NBEAMS/2) + (NBEAMS%2);    
     
@@ -101,12 +105,9 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
         endcase
     end
 
-    (* USE_DSP = "YES" *)
-    reg [47:0] timer = {48{1'b0}};
-        
     reg timer_complete = 0;
     reg update_done = 0;
-    
+        
     always @(posedge wb_clk_i) begin
         // this actually does an extra write into the top address, but that's
         // always unused so I *do not care*.
@@ -119,12 +120,10 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
         if (state == RESET || state == IDLE_A || state == IDLE_B) scaler_write_any <= 0;
         else if (state == DATA_SHIFT_A || state == DATA_SHIFT_B) scaler_write_any <= 1;
     
-        if (timer_complete|| state == RESET || state == RESET_PREP_A)
-            timer <= `DLYFF {48{1'b0}};
-        else
-            timer <= `DLYFF timer + 1;
-        
-        timer_complete <= `DLYFF (timer == TIME_COUNT);
+
+        if (wb_rst_i) timer_complete <= `DLYFF 1'b0;
+        else if (timer_i) timer_complete <= `DLYFF 1'b1;
+        else if (state == IDLE_A || state == IDLE_B) timer_complete <= `DLYFF 1'b0;
 
         update_done <= `DLYFF (state == DATA_SHIFT_A || state == DATA_SHIFT_B) && scaler_addr[7];
         
@@ -266,4 +265,6 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
                      .regceb(1'b1));
     
     assign done_o = update_done;
+
+    assign write_bank_o = active_write_bank;
 endmodule
