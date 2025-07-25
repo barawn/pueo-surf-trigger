@@ -76,7 +76,7 @@
         "has_acout": [ { "value": "false", "resolve_type": "user", "format": "bool", "usage": "all" } ],
         "has_bcout": [ { "value": "false", "resolve_type": "user", "format": "bool", "usage": "all" } ],
         "has_carrycascout": [ { "value": "false", "resolve_type": "user", "format": "bool", "usage": "all" } ],
-        "has_pcout": [ { "value": "false", "resolve_type": "user", "format": "bool", "usage": "all" } ],
+        "has_pcout": [ { "value": "true", "value_src": "user", "resolve_type": "user", "format": "bool", "usage": "all" } ],
         "has_ce": [ { "value": "false", "resolve_type": "user", "format": "bool", "usage": "all" } ],
         "has_d_ce": [ { "value": "false", "resolve_type": "user", "format": "bool", "usage": "all" } ],
         "has_a_ce": [ { "value": "false", "resolve_type": "user", "format": "bool", "usage": "all" } ],
@@ -144,7 +144,7 @@
         "C_HAS_BCOUT": [ { "value": "0", "resolve_type": "generated", "format": "long", "usage": "all" } ],
         "C_HAS_CARRYCASCOUT": [ { "value": "0", "resolve_type": "generated", "format": "long", "usage": "all" } ],
         "C_HAS_CARRYOUT": [ { "value": "1", "resolve_type": "generated", "format": "long", "usage": "all" } ],
-        "C_HAS_PCOUT": [ { "value": "0", "resolve_type": "generated", "format": "long", "usage": "all" } ],
+        "C_HAS_PCOUT": [ { "value": "1", "resolve_type": "generated", "format": "long", "usage": "all" } ],
         "C_CONSTANT_1": [ { "value": "1", "resolve_type": "generated", "format": "long", "usage": "all" } ],
         "C_LATENCY": [ { "value": "128", "resolve_type": "generated", "format": "long", "usage": "all" } ],
         "C_OPMODES": [ { "value": "000011100010000000000000,000000011000001100000000", "resolve_type": "generated", "usage": "all" } ],
@@ -185,6 +185,7 @@
         "C": [ { "direction": "in", "size_left": "47", "size_right": "0", "driver_value": "0" } ],
         "CONCAT": [ { "direction": "in", "size_left": "47", "size_right": "0", "driver_value": "0" } ],
         "CARRYOUT": [ { "direction": "out", "driver_value": "0x0" } ],
+        "PCOUT": [ { "direction": "out", "size_left": "47", "size_right": "0", "driver_value": "0" } ],
         "P": [ { "direction": "out", "size_left": "47", "size_right": "0", "driver_value": "0" } ],
         "CEC5": [ { "direction": "in", "driver_value": "0x1" } ],
         "SCLRP": [ { "direction": "in", "driver_value": "0x0" } ]
@@ -367,6 +368,9 @@
           "mode": "master",
           "parameters": {
             "LAYERED_METADATA": [ { "value": "undef", "resolve_type": "generated", "is_ips_inferred": true, "is_static_object": false } ]
+          },
+          "port_maps": {
+            "DATA": [ { "physical_name": "PCOUT" } ]
           }
         },
         "p_intf": {
