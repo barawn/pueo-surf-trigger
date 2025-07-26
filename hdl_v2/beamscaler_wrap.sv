@@ -22,28 +22,66 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
                          parameter WBCLKTYPE = "NONE")(
                          
                          input ifclk_i,
+                         // These need to be ordered (low half = real)
+                         // (upper half = subthreshold)
                          input [NBEAMS*NSCALERS-1:0] count_i,
                          input timer_i,
                          output done_o,
                          
                          input wb_clk_i,
                          input wb_rst_i,
-                         // 96 scalers needs 7 bit addr
+                         // 96 scalers needs 7 bit addr, we make it 8 bits
+                         // for safety and split on the top bit
                          input scal_rd_i,
-                         input [6:0] scal_adr_i,
+                         input [7:0] scal_adr_i,
                          output [31:0] scal_dat_o,
-                         input [31:0] scal_period_i,
-                         input        scal_period_wr_i,                        
                          output write_bank_o
                          );
 
-    localparam NDUALBEAMS = (NBEAMS/2) + (NBEAMS%2);    
+    // OK - HERE'S THE ISSUE:
+    // We want to split up the scalers between real and subthreshold.
+    // We want them to be split up address-wise quite a bit.
+    // That way if the number of *beams* changes, the addressing
+    // doesn't. Subthresholds just start again at a high point.
+    //
+    // The problem with this is that because of the way we update,
+    // we always update 4 scaler values at a time. So suppose NBEAMS = 5.
+    // We have 10 scalers. So we need 3 quad beamscalers. But if we arrange
+    // them
+    // x x 9 8
+    // 7 6 5 4
+    // 3 2 1 0
+    // we mix the reals (0/1/2/3/4) and the subthresholds (5/6/7/8).
+    // So instead what we need to do is find the nearest power of 4.
+    // That way we can split up the scalers into the high and low set
+    // trivially, and if the scalers are mapped odd/even it's an easy
+    // remap. So now for 10, we would have
+    // 3: x x x 9  addr = 3 (really RAM addr = 0x84 WB addr = 0x204)
+    // 2: x x x 4  addr = 2 (really RAM addr = 0x04 WB addr = 0x4)
+    // 1: 8 7 6 5  addr = 1 (really RAM addr = 0x80 WB addr = 0x200)
+    // 0: 3 2 1 0  addr = 0 (really RAM addr = 0x00 WB addr = 0x0)
+    // This could house up to 8 beams. For NBEAMS = 11 (22 scalers) we have
+    // 5: X 212019      GROUP = 2 NREMAINING = 3
+    // 4: X 109 8       GROUP = 2 NREMAINING = 3
+    // 3: 18171615      GROUP = 1 NREMAINING = 4
+    // 2: 7 6 5 4       GROUP = 1 NREMAINING = 4
+    // 1: 14131211      GROUP = 0 NREMAINING = 4
+    // 0: 3 2 1 0       GROUP = 0 NREMAINING = 4
+    // So what we want to do is NBEAMS/4 + (NBEAMS%4 != 0) ? 1 : 0;
+    // And then as we loop through, if i is even, we check:
+    // GROUP = i & 'hFE
+    // BASE = GROUP*2 + (i%2 == 1) ? NBEAMS : 0
+    // NREMAINING = (NBEAMS - GROUP*2) > 3 ? 4 : (NBEAMS-GROUP*2)
+    // inputs = { {(4-NREMAINING){1'b0}}, (trig_in[BASE +: NREMAINING]) }
+    
+    // for 46 this will be 24
+    localparam NUM_QSCAL = 2*(NBEAMS/4 + (NBEAMS%4 != 0) ? 1 : 0);
     
     // we will do sleaze, and the input will be
     // i/2 and the output will be (i/2+1)%NDUALBEAMS.
     // This actually loops it around but the first beamscaler
     // doesn't connect its input, so it doesn't matter.
-    wire [NDUALBEAMS-1:0][48*2-1:0] cascade;
+    wire [NUM_QSCAL-1:0][48*2-1:0] cascade;
     wire [1:0][47:0] final_out;
     reg [23:0] dsp_capture_A = {24{1'b0}};
     reg [23:0] dsp_capture_B = {24{1'b0}};
@@ -72,7 +110,11 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
     // we have 512 x 72, but really 512 x 64.
     // We write 2x16 per clock, and the byte enables select which bank is being updated.
     // On the read side, the active read bank is the low address.
-    reg [7:0] scaler_addr = {8{1'b0}};
+    reg [8:0] scaler_addr = {9{1'b0}};
+    
+    // flip the subthresholds into the upper space
+    wire [7:0] scaler_addr_remap = { scaler_addr[0],
+                                     scaler_addr[1 +: 7] };
     reg active_write_bank = 0;
 
     reg [1:0] scaler_write = {2{1'b0}};
@@ -133,9 +175,9 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
         else if (state == IDLE_B) active_write_bank <= `DLYFF 1;
         
         if (state == IDLE_A || state == IDLE_B)
-            scaler_addr <= `DLYFF NDUALBEAMS-1;
+            scaler_addr <= `DLYFF NUM_QSCAL-1;
         else if (state == DSP_SHIFT_A || state == DSP_SHIFT_B)
-            scaler_addr <= `DLYFF scaler_addr[6:0] - 1;
+            scaler_addr <= `DLYFF scaler_addr[7:0] - 1;
             
         if (wb_rst_i) state <= `DLYFF RESET;
         else begin
@@ -146,14 +188,14 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
                 PREP_B: state <= `DLYFF COMPUTE_A_0;
                 COMPUTE_A_0: state <= `DLYFF COMPUTE_A_1;
                 COMPUTE_A_1: state <= `DLYFF DATA_SHIFT_A;
-                DATA_SHIFT_A: if (scaler_addr[7]) state <= `DLYFF IDLE_B;
+                DATA_SHIFT_A: if (scaler_addr[8]) state <= `DLYFF IDLE_B;
                               else state <= `DLYFF DSP_SHIFT_A;
                 DSP_SHIFT_A: state <= `DLYFF DATA_SHIFT_A;
                 IDLE_B: if (timer_complete) state <= `DLYFF PREP_A;
                 PREP_A: state <= `DLYFF COMPUTE_B_0;
                 COMPUTE_B_0: state <= `DLYFF COMPUTE_B_1;
                 COMPUTE_B_1: state <= `DLYFF DATA_SHIFT_B;
-                DATA_SHIFT_B: if (scaler_addr[7]) state <= `DLYFF IDLE_A;
+                DATA_SHIFT_B: if (scaler_addr[8]) state <= `DLYFF IDLE_A;
                               else state <= `DLYFF DSP_SHIFT_B;
                 DSP_SHIFT_B: state <= `DLYFF DATA_SHIFT_B;
             endcase
@@ -191,29 +233,14 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
 
     generate
         genvar i;
-        // we need NDUALBEAMS beamscalers.
-        for (i=0;i<NBEAMS;i=i+2) begin : BSC
-            localparam DUALIDX = i/2;            
-            // if we have 5 beams for instance
-            // count_i is 9:0
-            // NDUALBEAMS = 2
-            // at i=0 we grab [1:0] for [1:0]
-            // at i=0 we grab [3:2] for [3:2]
-            // at i=2 we grab [5:4] for [1:0]   2*i +: 2
-            // at i=2 we grab [7:6] for [3:2]   2*i+2 +: 2
-            // at i=4 we grab [9:8] for [1:0]   2*i +: 2
-            // at i=4 we insert 00 for  [3:2]
-            // so the base grab is 2*i      for scaler 0
-            //                     2*i+2    for scaler 1
-            // except if not (i+1) < NBEAMS we grab 00
-            wire [3:0] count_in;
+        for (i=0;i<NUM_QSCAL;i=i+1) begin : BSC
+            localparam GROUP = i & 'hFE;
+            localparam BASE = GROUP*2 + (i%2 == 1) ? NBEAMS : 0;
+            localparam NREMAINING = (NBEAMS - GROUP*2) > 3 ? 4 : (NBEAMS-GROUP*2);
+            
+            wire [3:0] count_in = (NREMAINING == 4) ? count_i[BASE +: 4] :
+                                      { {(4-NREMAINING){1'b0}}, count_i[BASE +: NREMAINING] };
             wire [48*2-1:0] dsp_out;
-            assign count_in[1:0] = count_i[2*i +: 2];
-            if (i+1 < NBEAMS) begin : RL
-                assign count_in[3:2] = count_i[2*i+2 +: 2];
-            end else begin : FK
-                assign count_in[3:2] = 2'b00;
-            end                    
             beamscaler #(.CASCADE(i==0 ? "FALSE" : "TRUE"),
                          .IFCLKTYPE(IFCLKTYPE),
                          .WBCLKTYPE(WBCLKTYPE))
@@ -229,7 +256,7 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
                          .pc_i(cascade[DUALIDX]),
                          .pc_o(cascade[(DUALIDX+1)%NDUALBEAMS]),
                          .count_o(dsp_out));
-            if (i+2 >= NBEAMS) begin : FINAL
+            if (i == NUM_QSCAL-1) begin : FINAL
                 assign final_out = dsp_out;
             end
         end
@@ -245,17 +272,17 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
     
     // ALL WE HAVE LEFT IS THE ACTUAL RAM!!!
     // NO WE CANNOT INFER THIS, IT AIN'T SUPPORTED
-    // 7 bit on write side
-    // 8 bit on read side
-    xpm_memory_sdpram #(.ADDR_WIDTH_A(7),
-                        .ADDR_WIDTH_B(8),
+    // 8 bit on write side
+    // 9 bit on read side
+    xpm_memory_sdpram #(.ADDR_WIDTH_A(8),
+                        .ADDR_WIDTH_B(9),
                         .READ_DATA_WIDTH_B(32),
                         .WRITE_DATA_WIDTH_A(64),
                         .BYTE_WRITE_WIDTH_A(8),
-                        .MEMORY_SIZE(8192))
+                        .MEMORY_SIZE(16384))
         u_scaler_ram(.clka(wb_clk_i),
                      .dina(ram_dina),
-                     .addra(scaler_addr),
+                     .addra(scaler_addr_remap),
                      .wea(ram_wea),
                      .ena(ram_ena),
                      .rstb(wb_rst_i),
