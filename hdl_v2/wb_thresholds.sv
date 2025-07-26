@@ -1,19 +1,23 @@
 `timescale 1ns / 1ps
 `include "interfaces.vh"
 // This is the WISHBONE threshold space.
-// It splits entirely into two: an upper control space
-// starting at 0x1000, and the lower threshold space
-// at 0x0000-0x0FFF.
-// Most of the threshold space is shadowed:
-// the primary thresholds are at 0x000 - 0x7FF
-// and the subthresholds are at  0x800 - 0xFFF
 //
+// Its true address space is not what is seen here, it's mangled
+// to match the old one. In the levelone space, we have:
+//
+// 0x0800 - 0x09FF      (thresholds)
+// 0x0a00 - 0x0bff      (subthresholds)
+// 0x0c00 - 0x0fff      (reserved)
+// 0x1800 - 0x1fff      (threshold/scal control)
+//
+// The mangling is just dropping bit 12 and swapping bit 13 to bit 12:
+// bit 12 is used to split the space into threshold/scalers. 
 //
 // NOTE NOTE NOTE: If this can't meet timing, swap the threshold
 // outputs to IFCLK and rebuffer in aclk. You can recapture
 // in aclk (see sec 7.1.4) using aclk_phase. Buffer it twice
 // (aclk_phase -> FF -> FF )
-//                      ^--- use this signal as "capture"
+//                      ^--- use this signal as "capture
 // and capture thresh_wr[1:0] <= {2{capture}} & thresh_wr_i;
 //             thresh_update[1:0] <= {2{capture}} & thresh_update_i;
 //             if (thresh_wr[0] && capture) thresh_dat[0] <= thresh_dat_i[0];
@@ -44,7 +48,9 @@ module wb_thresholds #(parameter WBCLKTYPE = "NONE",
         output [1:0] thresh_update_o
     );
 
-    wire [7:0] ram_wraddr = {wb_adr_i[3 +: 6], wb_adr_i[10], wb_adr_i[2]};
+    // address bit 9 splits between the thresholds and the subthresholds
+    // This gives a max number of beams of 128, which is waaay more than we need. 
+    wire [7:0] ram_wraddr = {wb_adr_i[3 +: 6], wb_adr_i[9], wb_adr_i[2]};
     wire [31:0] ram_wrdata = { {14{1'b0}}, wb_dat_i[0 +: 18] };
     wire [31:0] ram_wr_readback;
 
