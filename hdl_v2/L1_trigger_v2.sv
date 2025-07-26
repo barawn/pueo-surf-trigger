@@ -5,10 +5,6 @@
 module L1_trigger_v2 #(parameter NBEAMS=2, 
                        parameter WBCLKTYPE = "NONE", 
                        parameter CLKTYPE = "NONE",
-                       parameter [31:0] TARGET_DEFAULT = 32'h0,
-                       parameter [15:0] DELTA_DEFAULT = 16'h0,
-                       parameter [47:0] TRIGGER_CLOCKS=375000000,
-                       parameter HOLDOFF_CLOCKS=16,
                        localparam NCHAN=8,
                        localparam NSAMP=8,
                        localparam AGC_BITS=5)(
@@ -16,11 +12,6 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
         input wb_rst_i,
         `TARGET_NAMED_PORTS_WB_IF( wb_ , 13, 32 ),
 
-        output [47:0] mask_o,
-        output [1:0] mask_wr_o,
-        output mask_update_o,
-        output mask_rst_o,
-        
         input tclk,        
         input [NCHAN-1:0][AGC_BITS*NSAMP-1:0] dat_i,
         
@@ -31,83 +22,94 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
         output trigger_count_done_o
     );
 
-    // now we need a register core for the thresholds and generator.
-    // interface to the L1
-    // loop control
-    wire loop_enable;
-    wire reset_complete;
-    wire [1:0] loop_state_req;
-    wire [1:0] loop_state;
-    // params
-    wire [15:0] target_rate;
-    wire [31:0] target_delta;
-    // scaler data
-    wire [31:0] scal_data;
-    // beam index for both scalers and threshold
-    wire [5:0]  beam_idx;
-    // thresholds
-    wire [17:0] new_thresh_dat;
-    wire [17:0] thresh_dat;
-    wire thresh_update;
-    wire thresh_wr;
-    wire thresh_ack;
+    // OK - the L1 space consists of the thresholds
+    // and scalers. We split them up here, but mangle
+    // the addresses to match the old version.
     
-    // I dunno about these two
-    wire first_reset;
-    wire agc_reset;
-    // register core
-    L1_register_core #(.WBCLKTYPE(WBCLKTYPE),
-                       .TARGET_DEFAULT(TARGET_DEFAULT),
-                       .DELTA_DEFAULT(DELTA_DEFAULT))
-            u_levelone_regs(.wb_clk_i(wb_clk_i),
-                            `CONNECT_WBS_IFM( wb_ , thresh_ ),
-                            .loop_enable_o(loop_enable),
-                            .reset_complete_i(reset_complete),
-                            .loop_state_req_o(loop_state_req),
-                            .loop_state_i(loop_state),
-                            
-                            .target_rate_o(target_rate),
-                            .target_delta_o(target_delta),
-                            
-                            .scal_dat_i(scal_data),
-                            .beam_idx_o(beam_idx),
-                            
-                            .thresh_dat_i(thresh_dat),
-                            .thresh_dat_o(new_thresh_dat),
-                            .thresh_update_o(thresh_update),
-                            .thresh_wr_o(thresh_wr),
-                            .thresh_ack_i(thresh_ack),
-                            
-                            .mask_o(mask_o),
-                            .mask_wr_o(mask_wr_o),
-                            .mask_update_o(mask_update_o),
-                            .mask_rst_o(mask_reset_o),
-                            
-                            .first_reset_o(first_reset),
-                            .agc_reset_o(agc_reset));
+    // In the global levelone space, these are:
+    // 0x0000 - 0x03FF      (reserved)
+    // 0x0400 - 0x05FF      (scalers)
+    // 0x0600 - 0x07FF      (subthreshold scalers)
+    // 0x0800 - 0x09FF      (thresholds)
+    // 0x0a00 - 0x0bff      (subthresholds)
+    // 0x0c00 - 0x0fff      (reserved)
+    // 0x1000 - 0x17ff      (reserved)
+    // 0x1800 - 0x1fff      (threshold/scal control)
+    `DEFINE_WB_IF( thresh_ , 12, 32 );
+    `DEFINE_WB_IF( scaler_ , 12, 32 );
 
-    // note: tclk's clktype is the same as aclk since they're
-    // exactly the same clock, just off early on.
+    assign thresh_cyc_o = wb_cyc_i && wb_adr_i[11];
+    assign thresh_stb_o = thresh_cyc_o;
+    assign thresh_we_o = wb_we_i;
+    assign thresh_dat_o = wb_dat_i;
+    assign thresh_adr_o = { wb_adr_i[12],wb_adr_i[10:0] };
+    assign thresh_sel_o = wb_sel_i;
+    
+    assign scaler_cyc_o = wb_cyc_i && !wb_adr_i[11];
+    assign scaler_stb_o = scaler_cyc_o;
+    assign scaler_we_o = wb_we_i;
+    assign scaler_dat_o = wb_dat_i;
+    assign scaler_adr_o = { wb_adr_i[12],wb_adr_i[10:0] };
+    assign scaler_sel_o = wb_sel_i;
+    
+    assign wb_ack_o = (wb_adr_i[11]) ? thresh_ack_i : scaler_ack_i;
+    assign wb_dat_o = (wb_adr_i[11]) ? thresh_dat_i : scaler_dat_i;
+    assign wb_err_o = 1'b0;
+    assign wb_rty_o = 1'b0;
+    
+    wire scal_bank;     //! current active scaler bank (for debug/sync)
+    wire scal_timer;    //! scaler measure period is over
+    wire scal_rst;      //! force scaler update process into reset
+    
+    wire [18*2-1:0] thresh_dat; //! threshold setting bus
+    wire [1:0] thresh_wr;       //! threshold write (shift up cascade bus)
+    wire [1:0] thresh_update;   //! update all thresholds
+    
+    wire [1:0][NBEAMS-1:0] triggers;   //! both the real and subthresholds
+                                       //! 0 = real
+                                       //! 1 = subthreshold
+    wire [1:0][NBEAMS-1:0] trig_stretch;
+                                           
+    wb_thresholds #(.NBEAMS(NBEAMS))
+        u_thresh_wb( .wb_clk_i(wb_clk_i),
+                     `CONNECT_WBS_IFM( wb_ , thresh_ ),
+                     .scal_bank_i(scal_bank),
+                     .scal_timer_o(scal_timer),
+                     .scal_rst_o(scal_rst),
+                     .aclk(aclk),
+                     .thresh_o(thresh_dat),
+                     .thresh_wr_o(thresh_wr),
+                     .thresh_update_o(thresh_update));
+    
+    beamform_trigger_v2 #(.NBEAMS(NBEAMS))
+        u_beam_trigger( .clk_i(aclk),
+                        .data_i(dat_i),
+                        .thresh_i(thresh_dat),
+                        .thresh_wr_i(thresh_wr),
+                        .thresh_update_i(thresh_update),
+                        .trigger_o(triggers));
+    
+    // Now we want to cross the triggers from aclk -> ifclk.
+    // This is an old module we reuse, hence NBEAMS*2 to cover
+    // the subthresholds.
+    trig_cc_stretch #(.NBEAMS(NBEAMS*2))
+        u_stretch(.aclk(aclk),
+                  .aclk_phase_i(aclk_phase_i),
+                  .trig_i(triggers),
+                  .ifclk(ifclk),
+                  .trig_o(trig_stretch));
 
-    // these trigger signals are in ifclk
-    // signals from the loop controller
-    wire [17:0] loop_thresh;
-    wire [NBEAMS-1:0] loop_thresh_ce;
-    wire loop_update;
-    
-    beamform_trigger_wrap #(.NBEAMS(NBEAMS),
-                            .WBCLKTYPE(WBCLKTYPE),
-                            .CLKTYPE(CLKTYPE))
-        u_trigger( .tclk(tclk),
-                   .data_i(dat_i),
-                   
-                   .thresh_i(loop_thresh),
-                   .thresh_ce_i(loop_thresh_ce),
-                   .update_i(loop_update),
-                   
-                   .aclk(aclk),
-                   .aclk_phase_i(aclk_phase_i),
-                   .ifclk(ifclk),
-                   .trigger_o(trigger_o));
-    
+    assign trigger_o = trig_stretch[0];
+
+    beamscaler_wb_wrap #(.NBEAMS(NBEAMS))
+        u_scalers(.wb_clk_i(wb_clk_i),
+                  `CONNECT_WBS_IFM(wb_ , scaler_ ),
+                  
+                  .ifclk_i(ifclk),
+                  .count_i(trig_stretch),
+                  .timer_i(scal_timer),
+                  .done_o(trigger_count_done_o),
+                  .bank_o(scal_bank),
+                  .rst_i(scal_rst));
+
 endmodule
