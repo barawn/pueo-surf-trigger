@@ -128,7 +128,7 @@ module beamform_trigger_v2 #(  parameter NBEAMS = 2,
                 // It's not smart enough to trim stuff cleanly.
                 wire [NCHAN-1:0][NSAMP*NBITS-1:0] zero = {NCHAN*NSAMP*NBITS{1'b0}};
                 wire [3:0] trigger_out;
-                dual_pueo_beam #(.INTYPE("RAW"),.CASCADE(beam_idx == 0 ? "FALSE" : "TRUE"))
+                dual_pueo_beam_v2 #(.INTYPE("RAW"),.CASCADE(beam_idx == 0 ? "FALSE" : "TRUE"))
                   u_beamform_single(
                     .clk_i(clk_i),
                     .beamA_i(beams_delayed[beam_idx + 0]),
