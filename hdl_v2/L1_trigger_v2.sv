@@ -70,6 +70,7 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
                                        //! 1 = subthreshold
     wire [1:0][NBEAMS-1:0] trig_stretch;
                                            
+    // this can be aclk.
     wb_thresholds #(.NBEAMS(NBEAMS))
         u_thresh_wb( .wb_clk_i(wb_clk_i),
                      `CONNECT_WBS_IFM( wb_ , thresh_ ),
@@ -81,8 +82,9 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
                      .thresh_wr_o(thresh_wr),
                      .thresh_update_o(thresh_update));
     
+    // this MUST be tclk
     beamform_trigger_v2 #(.NBEAMS(NBEAMS))
-        u_beam_trigger( .clk_i(aclk),
+        u_beam_trigger( .clk_i(tclk),
                         .data_i(dat_i),
                         .thresh_i(thresh_dat),
                         .thresh_wr_i(thresh_wr),
@@ -92,6 +94,8 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
     // Now we want to cross the triggers from aclk -> ifclk.
     // This is an old module we reuse, hence NBEAMS*2 to cover
     // the subthresholds.
+    //
+    // We can exit tclk here.
     trig_cc_stretch #(.NBEAMS(NBEAMS*2))
         u_stretch(.aclk(aclk),
                   .aclk_phase_i(aclk_phase_i),
