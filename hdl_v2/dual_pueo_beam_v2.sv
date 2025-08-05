@@ -56,8 +56,8 @@ module dual_pueo_beam_v2
         u_beamform(.clk_i(clk_i),
                    .beamA_i(beamA_i),
                    .beamB_i(beamB_i),
-                   .outA(dbgA),
-                   .outB(dbgB),
+                   .outA_o(dbgA),
+                   .outB_o(dbgB),
                    .sq_outA_o(squareA),
                    .sq_outB_o(squareB));
 
