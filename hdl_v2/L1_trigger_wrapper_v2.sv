@@ -67,7 +67,8 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
     // this is the threshold space
     L1_trigger_v2 #(.NBEAMS(NBEAMS),
                     .WBCLKTYPE(WBCLKTYPE),
-                    .CLKTYPE(CLKTYPE))
+                    .CLKTYPE(CLKTYPE),
+                    .IFCLKTYPE(IFCLKTYPE))
         u_trigger(.wb_clk_i(wb_clk_i),
                   .wb_rst_i(1'b0),
                   `CONNECT_WBS_IFM( wb_ , thresh_ ),

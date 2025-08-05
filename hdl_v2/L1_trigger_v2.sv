@@ -5,6 +5,7 @@
 module L1_trigger_v2 #(parameter NBEAMS=2, 
                        parameter WBCLKTYPE = "NONE", 
                        parameter CLKTYPE = "NONE",
+                       parameter IFCLKTYPE = "NONE",
                        localparam NCHAN=8,
                        localparam NSAMP=8,
                        localparam AGC_BITS=5)(
@@ -105,7 +106,9 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
 
     assign trigger_o = trig_stretch[0];
 
-    beamscaler_wb_wrap #(.NBEAMS(NBEAMS))
+    beamscaler_wb_wrap #(.NBEAMS(NBEAMS),
+                         .IFCLKTYPE(IFCLKTYPE),
+                         .WBCLKTYPE(WBCLKTYPE))
         u_scalers(.wb_clk_i(wb_clk_i),
                   `CONNECT_WBS_IFM(wb_ , scaler_ ),
                   
