@@ -11,6 +11,7 @@
 module beamform_trigger #(  parameter NBEAMS = 2,
                             parameter WBCLKTYPE = "PSCLK", 
                             parameter CLKTYPE = "ACLK",
+                            parameter ZERO_IS_FAKE = "FALSE",
                             // thank you SV 2009
                             localparam NBITS=5,
                             localparam NSAMP=8,
@@ -36,9 +37,12 @@ module beamform_trigger #(  parameter NBEAMS = 2,
     // localparam NBEAMS_AVAILABLE = 45;
 
     // NOTE THE BIG-ENDIAN ARRAYS HERE
-    localparam int delay_array [0:(`BEAM_TOTAL)-1][0:NCHAN-1] = `BEAM_ANTENNA_DELAYS;
+    localparam int real_delay_array [0:(`BEAM_TOTAL)-1][0:NCHAN-1] = `BEAM_ANTENNA_DELAYS;
+    localparam int fake_delay_array [0:(`BEAM_TOTAL)-1][0:NCHAN-1] = `FAKE_ANTENNA_DELAYS;
+    localparam int delay_array [0:(`BEAM_TOTAL)-1][0:NCHAN-1] = (ZERO_IS_FAKE == "TRUE") ?
+        fake_delay_array : real_delay_array;
+  
     localparam int index_array [0:(`BEAM_TOTAL)-1][0:NCHAN-1] = `BEAM_ANTENNA_INDICIES;
-
 
     reg  [SAMPLE_STORE_DEPTH*NSAMP*NBITS-1:0] sample_store [NCHAN-1:0];
     wire [NCHAN-1:0][NSAMP*NBITS-1:0] beams_delayed [NBEAMS-1:0];
