@@ -1,7 +1,7 @@
 `timescale 1ns / 1ps
 `include "interfaces.vh"
 
-`define STARTSCALE 18'd1800
+`define STARTSCALE 18'd1500
 `define STARTOFFSET 16'd0
 
 // Pre-trigger filter chain.

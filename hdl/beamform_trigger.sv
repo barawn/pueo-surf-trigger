@@ -1,5 +1,5 @@
 `timescale 1ns / 1ps
-`include "L1Beams_header.vh"
+`include "L1Beams_header_v2.vh"
 // 2 beam module.
 // Each beam input takes in 8x8x5 = 320 total inputs in OFFSET BINARY.
 // They are organized as { ch7[39:0], ch6[39:0], ch5[39:0], ch4[39:0], ch3[39:0], ch2[39:0], ch1[39:0], ch0[39:0] }
@@ -28,8 +28,8 @@ module beamform_trigger #(  parameter NBEAMS = 2,
     localparam SAMPLE_STORE_DEPTH = 8+2; // The +2 is for aligning antenna 0 to the same place every time, even with a "negative delay"
 
     generate
-        if(`MAX_ANTENNA_DELAY_0 > 8) begin: THROW_AN_ERROR
-            channel_0_max_antenna_delay_bigger_than_8 errormod();
+        if(`MAX_ANTENNA_DELAY_0 > 16) begin: THROW_AN_ERROR
+            channel_0_max_antenna_delay_bigger_than_16 errormod();
         end
     endgenerate
 
@@ -37,6 +37,8 @@ module beamform_trigger #(  parameter NBEAMS = 2,
 
     // NOTE THE BIG-ENDIAN ARRAYS HERE
     localparam int delay_array [0:(`BEAM_TOTAL)-1][0:NCHAN-1] = `BEAM_ANTENNA_DELAYS;
+    localparam int index_array [0:(`BEAM_TOTAL)-1][0:NCHAN-1] = `BEAM_ANTENNA_INDICIES;
+
 
     reg  [SAMPLE_STORE_DEPTH*NSAMP*NBITS-1:0] sample_store [NCHAN-1:0];
     wire [NCHAN-1:0][NSAMP*NBITS-1:0] beams_delayed [NBEAMS-1:0];
@@ -57,10 +59,13 @@ module beamform_trigger #(  parameter NBEAMS = 2,
 
         for(beam_idx=0; beam_idx<NBEAMS; beam_idx++) begin : ALIGNMENT
             for(chan_idx=0; chan_idx<NCHAN; chan_idx++) begin
-                // The first term below makes sure that antenna 0 always has a delay of 8. 
-                // If another antenna has a delay of 0, as long as antenna 0 has a max delay < 8 all should be good.
-                int sample_delay = (SAMPLE_STORE_DEPTH-1)*NSAMP - ((8 - delay_array[beam_idx][0]) + delay_array[beam_idx][chan_idx]);
-                assign beams_delayed[beam_idx][chan_idx] = sample_store[chan_idx][( sample_delay )*NBITS +: NSAMP*NBITS];
+                // Antenna 0 always has a delay of (2*NSAMP) = 16. 
+                // If another antenna has a delay of 0, as long antenna 0 has a max delay < 16 all should be good.
+                // The LOWER the index, the OLDER the sample
+                // The (SAMPLE_STORE_DEPTH-2) leaves 16 samples of headroom for "negative" delays
+                // 
+                int sample_delay = (SAMPLE_STORE_DEPTH-2)*NSAMP - (delay_array[beam_idx][chan_idx] - delay_array[beam_idx][0]);
+                assign beams_delayed[beam_idx][chan_idx] = sample_store[index_array[beam_idx][chan_idx]][( sample_delay )*NBITS +: NSAMP*NBITS];
             end
         end
 
@@ -91,7 +96,7 @@ module beamform_trigger #(  parameter NBEAMS = 2,
         end
 
 
-        // RIGHT NOW THE SAMPLES RUN IN REVERSE....
+        // Note that the samples "run in reverse"
         for(chan_idx=0; chan_idx<NCHAN; chan_idx++) begin
             for(clock_idx=SAMPLE_STORE_DEPTH-2; clock_idx>=0;clock_idx--) begin
                 always @(posedge clk_i) begin: SHIFT_SAMPLE_STORE
