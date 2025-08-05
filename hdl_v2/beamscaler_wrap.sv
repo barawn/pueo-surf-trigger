@@ -75,10 +75,10 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
     // inputs = { {(4-NREMAINING){1'b0}}, (trig_in[BASE +: NREMAINING]) }
     
     // for 46 this will be 24
-    localparam NUM_QSCAL = 2*(NBEAMS/4 + (NBEAMS%4 != 0) ? 1 : 0);
+    localparam NUM_QSCAL = 2*(NBEAMS/4 + ((NBEAMS%4 != 0) ? 1 : 0));
     
     // we will do sleaze, and the input will be
-    // i/2 and the output will be (i/2+1)%NDUALBEAMS.
+    // i/2 and the output will be (i/2+1)%NUM_QSCAL.
     // This actually loops it around but the first beamscaler
     // doesn't connect its input, so it doesn't matter.
     wire [NUM_QSCAL-1:0][48*2-1:0] cascade;
@@ -253,8 +253,8 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
                          .state_ce_i( beamscaler_state_ce ),
                          .dsp_ce_i( beamscaler_ce ),
                          .rstp_i(beamscaler_reset),
-                         .pc_i(cascade[DUALIDX]),
-                         .pc_o(cascade[(DUALIDX+1)%NDUALBEAMS]),
+                         .pc_i(cascade[i]),
+                         .pc_o(cascade[i%NUM_QSCAL]),
                          .count_o(dsp_out));
             if (i == NUM_QSCAL-1) begin : FINAL
                 assign final_out = dsp_out;
