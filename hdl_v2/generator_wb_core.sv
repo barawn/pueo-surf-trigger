@@ -7,6 +7,7 @@ module generator_wb_core #(parameter WBCLKTYPE = "NONE",
         input ifclk_running_i,
         `TARGET_NAMED_PORTS_WB_IF( wb_ , 13, 32 ),
         input ifclk,
+        output gen_rst_o,
         output [47:0] beam_mask_o,
         output [1:0] beam_mask_wr_o,
         output beam_mask_update_o
@@ -91,7 +92,7 @@ module generator_wb_core #(parameter WBCLKTYPE = "NONE",
             beam_wr[0] <= `ADDR_MATCH(wb_adr_i, MASK_REG_0, 13'hF);
             beam_wr[1] <= `ADDR_MATCH(wb_adr_i, MASK_REG_1, 13'hF);
             // matches EITHER
-            beam_preupdate <= wb_dat_i[31] && `ADDR_MATCH(wb_adr_i[13:0], MASK_REG_0, 13'h8);
+            beam_preupdate <= wb_dat_i[31] && `ADDR_MATCH(wb_adr_i, MASK_REG_0, 13'h8);
         end
         if (state == WRITE && `ADDR_MATCH(wb_adr_i, MASK_REG_0, 13'hF))
             beam_mask[0 +: 18] <= wb_dat_i[0 +: 18];
