@@ -55,7 +55,7 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
     wire trig_count_done;
    
     // and make 'em
-    L1_trigger_intercon( .wb_clk_i(wb_clk_i),
+    L1_trigger_intercon u_intercon(.wb_clk_i(wb_clk_i),
 			 `CONNECT_WBS_IFS( wb_ , wb_ ),
 			 `CONNECT_WBM_IFM( thresh_ , thresh_ ),
 			 `CONNECT_WBM_IFM( control_ , generator_ ),
@@ -89,10 +89,8 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
             u_chain(
                 .wb_clk_i(wb_clk_i),
                 .wb_rst_i(wb_rst_i),
-                // `CONNECT_WBS_IFS( wb_bq_ , wb_bq_ ),//L
-                // `CONNECT_WBS_IFS( wb_agc_ , wb_agc_ ),
-                `CONNECT_WBS_IFM( wb_bq_ , bq_submodule_ ),//L
-                `CONNECT_WBS_IFM( wb_agc_ , agc_submodule_ ),
+                `CONNECT_WBS_IFM( wb_bq_ , bq_ ),//L
+                `CONNECT_WBS_IFM( wb_agc_ , agc_ ),
                 .reset_i(reset_i), 
                 .agc_reset_i(agc_reset_i),
                 .aclk(tclk),
