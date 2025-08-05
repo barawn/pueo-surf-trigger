@@ -254,7 +254,7 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
                          .dsp_ce_i( beamscaler_ce ),
                          .rstp_i(beamscaler_reset),
                          .pc_i(cascade[i]),
-                         .pc_o(cascade[i%NUM_QSCAL]),
+                         .pc_o(cascade[(i+1)%NUM_QSCAL]),
                          .count_o(dsp_out));
             if (i == NUM_QSCAL-1) begin : FINAL
                 assign final_out = dsp_out;
