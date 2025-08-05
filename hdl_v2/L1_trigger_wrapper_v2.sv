@@ -56,6 +56,7 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
    
     // and make 'em
     L1_trigger_intercon u_intercon(.wb_clk_i(wb_clk_i),
+             .clock_enabled_i( ifclk_running_i ),
 			 `CONNECT_WBS_IFS( wb_ , wb_ ),
 			 `CONNECT_WBM_IFM( thresh_ , thresh_ ),
 			 `CONNECT_WBM_IFM( control_ , generator_ ),
@@ -82,6 +83,8 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
                   
     // this is the AGC and biquad space, and most of the trigger
     // chain.
+    // For now the AGC reset stuff is pulled from the generator.
+    wire agc_reset;
     trigger_chain_x8_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
                            .AGC_CONTROL(AGC_CONTROL),
                            .USE_BIQUADS(USE_BIQUADS),
@@ -91,23 +94,24 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
                 .wb_rst_i(wb_rst_i),
                 `CONNECT_WBS_IFM( wb_bq_ , bq_ ),//L
                 `CONNECT_WBS_IFM( wb_agc_ , agc_ ),
-                .reset_i(reset_i), 
-                .agc_reset_i(agc_reset_i),
+                .reset_i(1'b0), 
+                .agc_reset_i(agc_reset),
                 .aclk(tclk),
                 .dat_i(dat_i),
                 .dat_o(data_stage_connection));
       
     // finally this is the generator space, which in V2 is embedded
     // in the trigger module.   
-
+    // this also contains the AGC reset for no particularly good reason
     generator_wrap #(.WBCLKTYPE(WBCLKTYPE),
                      .IFCLKTYPE(IFCLKTYPE),
                      .NBEAMS(NBEAMS))
         u_generator( .wb_clk_i(wb_clk_i),
                      `CONNECT_WBS_IFM( wb_ , generator_ ),
+                     .agc_reset_o(agc_reset),
                      .ifclk(ifclk),
                      .ifclk_running_i(ifclk_running_i),
-                     .trig_i(triggers),
+                     .trig_i(triggers),                     
                      .runrst_i(runrst_i),
                      .runstop_i(runstop_i),
                      `CONNECT_AXI4S_MIN_IF( trig_, m_trig_ ));                              

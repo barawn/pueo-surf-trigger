@@ -6,6 +6,7 @@ module generator_wb_core #(parameter WBCLKTYPE = "NONE",
         input wb_clk_i,
         input ifclk_running_i,
         `TARGET_NAMED_PORTS_WB_IF( wb_ , 13, 32 ),
+        output agc_reset_o,
         input ifclk,
         output gen_rst_o,
         output [47:0] beam_mask_o,
@@ -22,6 +23,8 @@ module generator_wb_core #(parameter WBCLKTYPE = "NONE",
     
     (* CUSTOM_CC_SRC = WBCLKTYPE *)
     reg gen_rst = 0;
+
+    reg agc_reset = 0;
 
     reg beam_update = 1'b0;
     
@@ -46,7 +49,7 @@ module generator_wb_core #(parameter WBCLKTYPE = "NONE",
     reg [31:0] wb_dat = {32{1'b0}};
     wire [31:0] wb_regs[3:0];
     assign wb_regs[0] = {32{1'b0}};
-    assign wb_regs[1] = { {16{1'b0}}, {7{1'b0}}, gen_rst, {8{1'b0}} };
+    assign wb_regs[1] = { {16{1'b0}}, {7{1'b0}}, gen_rst, {6{1'b0}}, agc_reset, 1'b0 };
     assign wb_regs[2] = { {14{1'b0}}, beam_mask[0 +: 18] };
     assign wb_regs[3] = { {2{1'b0}}, beam_mask[18 +: 30] };
     
@@ -80,6 +83,7 @@ module generator_wb_core #(parameter WBCLKTYPE = "NONE",
         endcase
         
         if (state == WRITE && `ADDR_MATCH(wb_adr_i, CONTROL_REG_1, 13'hF)) begin
+            agc_reset <= wb_dat_i[1];
             gen_rst <= wb_dat_i[8];
         end
         
@@ -122,4 +126,6 @@ module generator_wb_core #(parameter WBCLKTYPE = "NONE",
     assign wb_err_o = 1'b0;
     assign wb_rty_o = 1'b0;
     assign wb_dat_o = wb_dat;    
+
+    assign agc_reset_o = agc_reset;
 endmodule
