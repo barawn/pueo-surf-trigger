@@ -7,10 +7,13 @@
 // 1) Shannon-Whitaker low pass filter
 // 2) Two Biquads in serial (to be used as notches)
 // 3) AGC and 12->5 bit conversion
-module L1_trigger #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
+module L1_trigger #(parameter NBEAMS=2, 
+                    parameter ZERO_IS_FAKE="FALSE",
+                    parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
                     parameter USE_BIQUADS = "FALSE",
                     parameter HDL_FILTER_VERSION = "DEFAULT",
                     parameter WBCLKTYPE = "PSCLK", parameter CLKTYPE = "ACLK",
+                    parameter AGC_CONTROL = "FALSE",
                     parameter [47:0] TRIGGER_CLOCKS=375000000,
                     parameter HOLDOFF_CLOCKS=16)( // at 375 MHz this will count for 1 s  
 
@@ -264,10 +267,12 @@ module L1_trigger #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTION_BITS =
     assign dat_debug = data_stage_debug;
     `endif
 
-    trigger_chain_x8_wrapper #( .AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
-                                .USE_BIQUADS(USE_BIQUADS),
-                                .HDL_FILTER_VERSION(HDL_FILTER_VERSION),
-                                .WBCLKTYPE(WBCLKTYPE),.CLKTYPE(CLKTYPE))
+
+    trigger_chain_x8_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
+                               .AGC_CONTROL(AGC_CONTROL),
+                               .HDL_FILTER_VERSION(HDL_FILTER_VERSION),
+                               .USE_BIQUADS(USE_BIQUADS),
+                               .WBCLKTYPE(WBCLKTYPE),.CLKTYPE(CLKTYPE))
                 u_chain(
                     .wb_clk_i(wb_clk_i),
                     .wb_rst_i(wb_rst_i),
@@ -288,6 +293,7 @@ module L1_trigger #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTION_BITS =
     endgenerate
 
     beamform_trigger #(.NBEAMS(NBEAMS),
+                       .ZERO_IS_FAKE(ZERO_IS_FAKE),
                        .WBCLKTYPE(WBCLKTYPE),
                        .CLKTYPE(CLKTYPE)) 
         u_trigger(

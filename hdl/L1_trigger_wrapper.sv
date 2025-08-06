@@ -4,7 +4,9 @@
 `define DLYFF #0.1
 `define STARTTHRESH 18'd4500
 
-module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
+module L1_trigger_wrapper #(parameter NBEAMS=2, 
+                            localparam ZERO_IS_FAKE = (NBEAMS == 2) ? "TRUE" : "FALSE",
+                    parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
                     parameter USE_BIQUADS = "FALSE",
                     parameter HDL_FILTER_VERSION = "DEFAULT",
                     parameter WBCLKTYPE = "PSCLK", parameter CLKTYPE = "ACLK",
@@ -34,6 +36,8 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
     localparam [9:0] THRESHOLD_MASK = {10{1'b1}};
     localparam NBITS_KP = 32;
     localparam NFRAC_KP = 10;
+    
+    localparam AGC_CONTROL = "TRUE";
 
     // Pass commands not about trigger rate control loop down
     `DEFINE_WB_IF( wb_L1_submodule_ , 22, 32);
@@ -183,10 +187,12 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
         end
     endtask
 
+
+//     `define ADDR_MATCH( addr, val, mask ) ( ( addr & mask ) == (val & mask) )
     always @(posedge wb_clk_i) begin
-        mask_wr[0] <= wb_cyc_i && wb_stb_i && wb_we_i && wb_ack_o && `ADDR_MATCH(wb_adr_i[13:0], 14'h1008, 14'h3FFF);
-        mask_wr[1] <= wb_cyc_i && wb_stb_i && wb_we_i && wb_ack_o && `ADDR_MATCH(wb_adr_i[13:0], 14'h100C, 14'h3FFF);
-        mask_preupdate <= wb_dat_i[31] && wb_cyc_i && wb_stb_i && wb_we_i && wb_ack_o && `ADDR_MATCH(wb_adr_i[13:0], 14'h1008, 14'h3FFB);
+        mask_wr[0] <= (state == WRITE) && `ADDR_MATCH(wb_adr_i[13:0], 14'h1008, 14'h3FFF);
+        mask_wr[1] <= (state == WRITE) && `ADDR_MATCH(wb_adr_i[13:0], 14'h100C, 14'h3FFF);
+        mask_preupdate <= wb_dat_i[31] && (state == WRITE) && `ADDR_MATCH(wb_adr_i[13:0], 14'h1008, 14'h3FFB);
         mask_update <= mask_preupdate;
         
         if (wb_rst_i) begin // Reset everything
@@ -378,9 +384,9 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
                         // Will figure out multiplication in the future
                         // For now just simply raise or lower by set amount
                         if(trigger_count_reg[beam_idx] > (trigger_target_wb_reg + COUNT_MARGIN)) begin
-                            threshold_recalculated_regs[beam_idx] = threshold_regs[beam_idx] + trigger_control_delta;
+                            threshold_recalculated_regs[beam_idx] <= threshold_regs[beam_idx] + trigger_control_delta;
                         end else if (trigger_count_reg[beam_idx] < (trigger_target_wb_reg - COUNT_MARGIN)) begin
-                            threshold_recalculated_regs[beam_idx] = threshold_regs[beam_idx] - trigger_control_delta;
+                            threshold_recalculated_regs[beam_idx] <= threshold_regs[beam_idx] - trigger_control_delta;
                         end
                         // TODO: Clip this
                         beam_idx <= beam_idx + 1;
@@ -469,6 +475,8 @@ module L1_trigger_wrapper #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTIO
                     .USE_BIQUADS(USE_BIQUADS),
                     .HDL_FILTER_VERSION(HDL_FILTER_VERSION),
                     .WBCLKTYPE(WBCLKTYPE),
+                    .AGC_CONTROL(AGC_CONTROL),
+                    .ZERO_IS_FAKE(ZERO_IS_FAKE),
                     .CLKTYPE(CLKTYPE),
                     .TRIGGER_CLOCKS(TRIGGER_CLOCKS),
                     .NBEAMS(NBEAMS))

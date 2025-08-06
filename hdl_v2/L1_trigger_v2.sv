@@ -1,310 +1,119 @@
 `timescale 1ns / 1ps
 `include "interfaces.vh"
-`include "L1Beams_header.vh"
 
-`define USING_DEBUG 0
 `define DLYFF #0.1
-// Pre-trigger filter chain.
-// 1) Shannon-Whitaker low pass filter
-// 2) Two Biquads in serial (to be used as notches)
-// 3) AGC and 12->5 bit conversion
-module L1_trigger_v2 #(parameter NBEAMS=2, parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
-                       parameter USE_BIQUADS = "FALSE",
-                       parameter WBCLKTYPE = "PSCLK", parameter CLKTYPE = "ACLK",
-                       parameter [47:0] TRIGGER_CLOCKS=375000000,
-                       parameter HOLDOFF_CLOCKS=16)( // at 375 MHz this will count for 1 s  
-
+module L1_trigger_v2 #(parameter NBEAMS=2, 
+                       parameter WBCLKTYPE = "NONE", 
+                       parameter CLKTYPE = "NONE",
+                       localparam NCHAN=8,
+                       localparam NSAMP=8,
+                       localparam AGC_BITS=5)(
         input wb_clk_i,
         input wb_rst_i,
+        `TARGET_NAMED_PORTS_WB_IF( wb_ , 13, 32 ),
 
-        // Two wishbone interfaces 
-
-        // First controls AGC aqnd Biquads
-        // Bit 12 differentiates between the two (0 for AGC, 1 for BQs)
-        `TARGET_NAMED_PORTS_WB_IF( wb_ , 22, 32 ), // Address width, data width.
-
-        // Second controls L1 thresholds
-        `TARGET_NAMED_PORTS_WB_IF( wb_threshold_ , 22, 32 ), // Address width, data width.
-
-        // No more polling for cycle finish, that's silly.
-        output trig_count_done_o,
+        input tclk,        
+        input [NCHAN-1:0][AGC_BITS*NSAMP-1:0] dat_i,
         
-        // Control to capture the output to the RAM buffer
-        input reset_i, 
-        input agc_reset_i,
-
         input aclk,
-        input [7:0][95:0] dat_i,
-
-        `ifdef USING_DEBUG
-        output [7:0][39:0] dat_o,
-        output [7:0][1:0][95:0] dat_debug,
-        `endif
-
-        output [NBEAMS-1:0] trigger_o
+        input aclk_phase_i,
+        input ifclk,
+        output [NBEAMS-1:0] trigger_o,
+        output trigger_count_done_o
     );
 
-    `define ADDR_MATCH( addr, val, mask ) ( ( addr & mask ) == (val & mask) )
-    localparam [9:0] THRESHOLD_MASK = {10{1'b1}};
-
-    // State machine control
-    localparam FSM_BITS = 3;
-    localparam [FSM_BITS-1:0] IDLE = 0;
-    localparam [FSM_BITS-1:0] WRITE = 1;
-    localparam [FSM_BITS-1:0] READ = 2;
-    localparam [FSM_BITS-1:0] DELAY = 3;
-    localparam [FSM_BITS-1:0] ACK = 4;
-    reg [FSM_BITS-1:0] state = IDLE;    
-
-    localparam HOLDOFF_BITS = $clog2(HOLDOFF_CLOCKS)+1;
-    wire [NBEAMS-1:0] trigger_signal_bit_o;
-    wire[NBEAMS-1:0][31:0] trigger_count_out;
-    reg [NBEAMS-1:0][HOLDOFF_BITS-1:0] holdoff_delay = {(NBEAMS*HOLDOFF_BITS){1'b0}};
-
-    (* CUSTOM_CC_DST = WBCLKTYPE *)
-    reg [31:0] response_reg = 31'h0; // Pass back trigger count information
-
-    (* CUSTOM_CC_DST = WBCLKTYPE *)
-    reg [NBEAMS-1:0][31:0] trigger_count_wb_reg; // Pass back # of triggers on WB
-
-    (* CUSTOM_CC_SRC = CLKTYPE *) // If the timing fails, try again with this (changed to src)
-    reg [NBEAMS-1:0][31:0] trigger_count_reg; // Pass back # of triggers on WB
-
-
-
-    // Wishbone connection split between AGC, Biquads, and Trigger Rate
-    // Use bits 14 and 13 to differentiate, 00 for AGC, 01 for Biquad, 10 for Trigger Rate
-    // These interfaces are host-named (M). Sine the ports of this module are target-named,
-    // there needs to be crossover
-    `DEFINE_WB_IF( agc_submodule_ , 22, 32);
-    `DEFINE_WB_IF( bq_submodule_ , 22, 32);
-
-
-    //  Top interface target (S)        Connection interface (M)
-    assign wb_ack_o = (wb_adr_i[13]) ? bq_submodule_ack_i : agc_submodule_ack_i;
-    assign wb_err_o = (wb_adr_i[13]) ? bq_submodule_err_i : agc_submodule_err_i;
-    assign wb_rty_o = (wb_adr_i[13]) ? bq_submodule_rty_i : agc_submodule_rty_i;
-    assign wb_dat_o = (wb_adr_i[13]) ? bq_submodule_dat_i : agc_submodule_dat_i;
-
-
-    assign wb_threshold_ack_o = (state == ACK);
-    assign wb_threshold_err_o = 1'b0;
-    assign wb_threshold_rty_o = 1'b0;
-    assign wb_threshold_dat_o = response_reg;
-
-    assign agc_submodule_cyc_o = wb_cyc_i && !wb_adr_i[13];
-    assign bq_submodule_cyc_o = wb_cyc_i && wb_adr_i[13];
+    // OK - the L1 space consists of the thresholds
+    // and scalers. We split them up here, but mangle
+    // the addresses to match the old version.
     
-    assign agc_submodule_stb_o = wb_stb_i;
-    assign bq_submodule_stb_o = wb_stb_i;
-    assign agc_submodule_adr_o = wb_adr_i;
-    assign bq_submodule_adr_o = wb_adr_i;
-    assign agc_submodule_dat_o = wb_dat_i;
-    assign bq_submodule_dat_o = wb_dat_i;
-    assign agc_submodule_we_o = wb_we_i;
-    assign bq_submodule_we_o = wb_we_i;
-    assign agc_submodule_sel_o = wb_sel_i;
-    assign bq_submodule_sel_o = wb_sel_i;
+    // In the global levelone space, these are:
+    // 0x0000 - 0x03FF      (reserved)
+    // 0x0400 - 0x05FF      (scalers)
+    // 0x0600 - 0x07FF      (subthreshold scalers)
+    // 0x0800 - 0x09FF      (thresholds)
+    // 0x0a00 - 0x0bff      (subthresholds)
+    // 0x0c00 - 0x0fff      (reserved)
+    // 0x1000 - 0x17ff      (reserved)
+    // 0x1800 - 0x1fff      (threshold/scal control)
+    `DEFINE_WB_IF( thresh_ , 12, 32 );
+    `DEFINE_WB_IF( scaler_ , 12, 32 );
 
-
-    ////////////////////////////////////////////////////////
-    //////        Wishbone FSM stolen from AGC        //////
-    ////////////////////////////////////////////////////////
-
-    // (* CUSTOM_CC_SRC = WBCLKTYPE *) // Store the thresholds here
-    reg [NBEAMS-1:0][17:0] threshold_regs = {(NBEAMS*18){1'b0}};
-
-    (* CUSTOM_CC_SRC = WBCLKTYPE *)
-    reg [17:0] threshold_writing = {18{1'b0}};
-    // reg  [NBEAMS-1:0] trigger_threshold_written_aclk = 1'b0;
-    // reg  [NBEAMS-1:0] trigger_threshold_written_wbclk = 1'b0;
-
-    reg  [NBEAMS-1:0] trigger_threshold_ce = {NBEAMS{1'b0}};
-    wire [NBEAMS-1:0] trigger_threshold_ce_aclk;
-
-
-    // flag_sync u_CE_flag(.in_clkA(trigger_threshold_written_aclk),.clkA(aclk),
-    //                     .out_clkB(trigger_threshold_written_wbclk),.clkB(wb_clk_i));
-
-    // Update all thresholds
-    (* CUSTOM_CC_SRC = WBCLKTYPE *)
-    reg trigger_threshold_update = 0;
-    wire trigger_threshold_update_aclk;
-    flag_sync u_update_flag(.in_clkA(trigger_threshold_update),.clkA(wb_clk_i),
-                            .out_clkB(trigger_threshold_update_aclk),.clkB(aclk));
-
-    // Request trigger count
-    (* CUSTOM_CC_SRC = WBCLKTYPE *)
-    reg req_trigger_count = 0;
-    wire trigger_count_aclk;
-    flag_sync u_tick_flag(.in_clkA(req_trigger_count),.clkA(wb_clk_i),
-                          .out_clkB(trigger_count_aclk),.clkB(aclk));
-
-    // Mark the trigger count as completed
-    reg  trigger_count_done = 0;
-    wire trigger_count_done_aclk;
-    wire trigger_count_done_wbclk;
-    flag_sync u_done_flag(.in_clkA(trigger_count_done_aclk),.clkA(aclk),
-                          .out_clkB(trigger_count_done_wbclk),.clkB(wb_clk_i));
-
-
-
-    // Trigger rate sampling period control
-    reg trigger_count_ce = 0; // Clock enable for counting out the 375 MHz clock
-    wire trigger_time_done; // Signal that the trigger counting period is over
-    always @(posedge aclk) begin
-        if (trigger_count_aclk) trigger_count_ce <= 1'b1; // If you see a flag to start, enable clock
-        else if (trigger_time_done) trigger_count_ce <= 1'b0; // If the period is over, stop counting
-    end        
-    // Move trigger_time_done to trigger_count_done_aclk, with a delay of 6 aclks
-    reg [5:0] trigger_done_delay = {6{1'b0}};
-    always @(posedge aclk) trigger_done_delay <= { trigger_done_delay[4:0], trigger_time_done };
-    assign trigger_count_done_aclk = trigger_done_delay[5];
-
-    // This is where we will count out the clocks in our trigger sampling period (shared by all beams) 
-    dsp_counter_terminal_count #(.FIXED_TCOUNT("TRUE"),
-                                .FIXED_TCOUNT_VALUE(TRIGGER_CLOCKS),
-                                .HALT_AT_TCOUNT("TRUE"))
-        u_trigger_timer(.clk_i(aclk),
-                        .rst_i(trigger_count_aclk), // Reset the counter with new request flag
-                        .count_i(trigger_count_ce),
-                        .tcount_reached_o(trigger_time_done));
-
-
-    genvar beam_idx;
-    generate
-        for(beam_idx=0; beam_idx<NBEAMS; beam_idx++) begin : CE_FLAGS_AND_THRESHOLD  
-            // Flag to clock enable for a specific beam threshold load in
-            flag_sync u_CE_flag(.in_clkA(trigger_threshold_ce[beam_idx]),.clkA(wb_clk_i),
-                                .out_clkB(trigger_threshold_ce_aclk[beam_idx]),.clkB(aclk));     
-
-            // Increment the counter if there is a trigger and not in holdoff
-            always @(posedge aclk) begin
-                
-                if(trigger_count_aclk) begin // Reset for a new count
-                    trigger_count_reg[beam_idx] <= 0;
-                    holdoff_delay[beam_idx] <= 0; // reset the holdoff
-                end else if(trigger_count_ce && trigger_signal_bit_o[beam_idx] && (holdoff_delay[beam_idx]==0)) begin
-                    trigger_count_reg[beam_idx] <= trigger_count_reg[beam_idx] + 1;
-                    holdoff_delay[beam_idx] <= HOLDOFF_CLOCKS; // Begin the holdoff
-                end else if(holdoff_delay[beam_idx]>0) begin
-                    holdoff_delay[beam_idx] <= holdoff_delay[beam_idx] - 1; // Count down from last trigger count
-                end
-            end
-        end
-    endgenerate
-
-    wire [7:0] beam_idx_adr = wb_threshold_adr_i[9:2]; // Used to select which beam we are working on
-
-    // Moving this outside to please synthesizer
-    // Stage a threshold in for a specific beam
-    always @(posedge wb_clk_i) begin
-    //  ------->                                                           0x800
-        if((state == IDLE) && (wb_threshold_cyc_i && wb_threshold_stb_i && wb_threshold_adr_i[11] && wb_threshold_we_i && wb_threshold_sel_i[1] && wb_threshold_dat_i[0]))
-        begin
-            trigger_threshold_ce[beam_idx_adr] <= 1'b1;
-            threshold_writing <= threshold_regs[beam_idx_adr];
-        end else begin
-            trigger_threshold_ce[beam_idx_adr] <= 1'b0;
-        end
-    end
-
-    always @(posedge wb_clk_i) begin
-        if (req_trigger_count) trigger_count_done <= 0;
-        else if (trigger_count_done_wbclk) trigger_count_done <= 1;
-        
-        if (trigger_count_done_wbclk) begin // flag that a counting cycle just completed
-            trigger_count_wb_reg <= trigger_count_reg; // Contains all results
-        end            
-
-        // Write command flags. These handle writes to address 0x00.
-        req_trigger_count <= (state == IDLE) && (wb_threshold_cyc_i && wb_threshold_stb_i && `ADDR_MATCH( wb_threshold_adr_i, 10'h000, THRESHOLD_MASK ) && wb_threshold_we_i && wb_threshold_sel_i[0] && wb_threshold_dat_i[0]);
-        trigger_threshold_update <= (state == IDLE) && (wb_threshold_cyc_i && wb_threshold_stb_i && `ADDR_MATCH( wb_threshold_adr_i, 10'h000, THRESHOLD_MASK ) && wb_threshold_we_i && wb_threshold_sel_i[1] && wb_threshold_dat_i[1]);
-
-        // Determine what we are doing this cycle
-        case (state)
-            IDLE: if (wb_threshold_cyc_i && wb_threshold_stb_i) begin
-                if (wb_threshold_we_i) state <= WRITE;
-                else state <= READ;
-            end
-            WRITE: state <= DELAY; // The delay is to let the the delayed threshold_CE complete the clock crossing
-            DELAY: state <= ACK;
-            READ: state <= ACK;
-            ACK: state <= IDLE;
-            default: state <= IDLE; // Should never go here, but there arae more bits than states
-        endcase
-        
-        // If reading, load the response in
-        if (state == READ) begin
-            if(wb_threshold_adr_i[10]) begin 
-                response_reg <= trigger_count_wb_reg[wb_threshold_adr_i[9:2]];
-            end
-            else if (wb_threshold_adr_i[11]) begin
-                response_reg <= {{14{1'b0}}, {threshold_regs[wb_threshold_adr_i[9:2]]}}; // Threshold is 18 bits
-            end
-            else begin
-                response_reg <= {{31{1'b0}}, {trigger_count_done}};
-            end
-        end
-        // If writing to a threshold, put it in the appropriate register
-        if (state == WRITE) begin
-            if (wb_threshold_adr_i[10]) begin // The 8th bit is used to indicate a threshold write
-                if (wb_threshold_sel_i[0]) threshold_regs[wb_threshold_adr_i[9:2]][7:0] <= wb_threshold_dat_i[7:0];
-                if (wb_threshold_sel_i[1]) threshold_regs[wb_threshold_adr_i[9:2]][15:8] <= wb_threshold_dat_i[15:8];
-                if (wb_threshold_sel_i[2]) threshold_regs[wb_threshold_adr_i[9:2]][17:16] <= wb_threshold_dat_i[17:16];
-            end             
-        end
-    end
-
-    // TODO: Check about this clock crossing //L
-    assign trigger_count_out = trigger_count_reg;
-
-    wire  [7:0][39:0] data_stage_connection;
-    wire  [7:0][39:0] data_stage_debug;
+    assign thresh_cyc_o = wb_cyc_i && wb_adr_i[11];
+    assign thresh_stb_o = thresh_cyc_o;
+    assign thresh_we_o = wb_we_i;
+    assign thresh_dat_o = wb_dat_i;
+    assign thresh_adr_o = { wb_adr_i[12],wb_adr_i[10:0] };
+    assign thresh_sel_o = wb_sel_i;
     
-    `ifdef USING_DEBUG
-    assign dat_o = data_stage_connection;
-    assign dat_debug = data_stage_debug;
-    `endif
+    assign scaler_cyc_o = wb_cyc_i && !wb_adr_i[11];
+    assign scaler_stb_o = scaler_cyc_o;
+    assign scaler_we_o = wb_we_i;
+    assign scaler_dat_o = wb_dat_i;
+    assign scaler_adr_o = { wb_adr_i[12],wb_adr_i[10:0] };
+    assign scaler_sel_o = wb_sel_i;
+    
+    assign wb_ack_o = (wb_adr_i[11]) ? thresh_ack_i : scaler_ack_i;
+    assign wb_dat_o = (wb_adr_i[11]) ? thresh_dat_i : scaler_dat_i;
+    assign wb_err_o = 1'b0;
+    assign wb_rty_o = 1'b0;
+    
+    wire scal_bank;     //! current active scaler bank (for debug/sync)
+    wire scal_timer;    //! scaler measure period is over
+    wire scal_rst;      //! force scaler update process into reset
+    
+    wire [18*2-1:0] thresh_dat; //! threshold setting bus
+    wire [1:0] thresh_wr;       //! threshold write (shift up cascade bus)
+    wire [1:0] thresh_update;   //! update all thresholds
+    
+    wire [1:0][NBEAMS-1:0] triggers;   //! both the real and subthresholds
+                                       //! 0 = real
+                                       //! 1 = subthreshold
+    wire [1:0][NBEAMS-1:0] trig_stretch;
+                                           
+    // this can be aclk.
+    wb_thresholds #(.NBEAMS(NBEAMS))
+        u_thresh_wb( .wb_clk_i(wb_clk_i),
+                     `CONNECT_WBS_IFM( wb_ , thresh_ ),
+                     .scal_bank_i(scal_bank),
+                     .scal_timer_o(scal_timer),
+                     .scal_rst_o(scal_rst),
+                     .aclk(aclk),
+                     .thresh_o(thresh_dat),
+                     .thresh_wr_o(thresh_wr),
+                     .thresh_update_o(thresh_update));
+    
+    // this MUST be tclk
+    beamform_trigger_v2 #(.NBEAMS(NBEAMS))
+        u_beam_trigger( .clk_i(tclk),
+                        .data_i(dat_i),
+                        .thresh_i(thresh_dat),
+                        .thresh_wr_i(thresh_wr),
+                        .thresh_update_i(thresh_update),
+                        .trigger_o(triggers));
+    
+    // Now we want to cross the triggers from aclk -> ifclk.
+    // This is an old module we reuse, hence NBEAMS*2 to cover
+    // the subthresholds.
+    //
+    // We can exit tclk here.
+    trig_cc_stretch #(.NBEAMS(NBEAMS*2))
+        u_stretch(.aclk(aclk),
+                  .aclk_phase_i(aclk_phase_i),
+                  .trig_i(triggers),
+                  .ifclk(ifclk),
+                  .trig_o(trig_stretch));
 
-    trigger_chain_x8_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
-                               .USE_BIQUADS(USE_BIQUADS),
-                               .WBCLKTYPE(WBCLKTYPE),.CLKTYPE(CLKTYPE))
-                u_chain(
-                    .wb_clk_i(wb_clk_i),
-                    .wb_rst_i(wb_rst_i),
-                    // `CONNECT_WBS_IFS( wb_bq_ , wb_bq_ ),//L
-                    // `CONNECT_WBS_IFS( wb_agc_ , wb_agc_ ),
-                    `CONNECT_WBS_IFM( wb_bq_ , bq_submodule_ ),//L
-                    `CONNECT_WBS_IFM( wb_agc_ , agc_submodule_ ),
-                    .reset_i(reset_i), 
-                    .agc_reset_i(agc_reset_i),
-                    .aclk(aclk),
-                    .dat_i(dat_i),
-                    `ifdef USING_DEBUG
-                    .dat_debug(dat_debug),
-                    `endif
-                    .dat_o(data_stage_connection));
+    assign trigger_o = trig_stretch[0];
 
-    generate
-        for(beam_idx=0; beam_idx<NBEAMS; beam_idx++) begin 
-            assign trigger_o[beam_idx] = trigger_signal_bit_o[beam_idx] && !(|holdoff_delay[beam_idx]);// holdoff_delay
-        end
-    endgenerate
+    beamscaler_wb_wrap #(.NBEAMS(NBEAMS))
+        u_scalers(.wb_clk_i(wb_clk_i),
+                  `CONNECT_WBS_IFM(wb_ , scaler_ ),
+                  
+                  .ifclk_i(ifclk),
+                  .count_i(trig_stretch),
+                  .timer_i(scal_timer),
+                  .done_o(trigger_count_done_o),
+                  .bank_o(scal_bank),
+                  .rst_i(scal_rst));
 
-    beamform_trigger #(.NBEAMS(NBEAMS),
-                       .WBCLKTYPE(WBCLKTYPE),
-                       .CLKTYPE(CLKTYPE)) 
-        u_trigger(
-            .clk_i(aclk),
-            .data_i(data_stage_connection),
-
-            .thresh_i(threshold_writing),
-            .thresh_ce_i(trigger_threshold_ce_aclk),
-            .update_i(trigger_threshold_update_aclk),        
-            
-            .trigger_o(trigger_signal_bit_o));
-
-
-    assign trig_count_done_o = trigger_count_done;
 endmodule
