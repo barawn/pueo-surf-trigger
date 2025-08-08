@@ -99,6 +99,7 @@ module beamform_trigger_v2 #(  parameter NBEAMS = 2,
         /////////////////// V2 STUFF STARTS HERE ////////////////////////////////
         for(beam_idx=0; beam_idx<NBEAMS; beam_idx = beam_idx+2) begin: DUAL_BEAMFORMERS        
             if(beam_idx+1<NBEAMS) begin: DUAL_USE
+                localparam DEBUG = (beam_idx == 0 && ZERO_IS_FAKE == "TRUE") ? "TRUE" : "FALSE";
                 wire [3:0] trigger_out;
                 // This still uses the RAW input mode:
                 // The POSTADD input mode instead requires us to create
@@ -108,7 +109,9 @@ module beamform_trigger_v2 #(  parameter NBEAMS = 2,
                 // create (A0 + E0, B0+C1+D2, F3+G4+H4, A1 + E1)
                 // then the POSTADD method would say "beam 0 is adder (0, 1, 2) and beam 1 is adder (3, 1, 2)
                 // All this because Vivado sucks.
-                dual_pueo_beam_v2 #(.INTYPE("RAW"),.CASCADE(beam_idx == 0 ? "FALSE" : "TRUE"))
+                dual_pueo_beam_v2 #(.INTYPE("RAW"),
+                                    .DEBUG(DEBUG),
+                                    .CASCADE(beam_idx == 0 ? "FALSE" : "TRUE"))
                  u_beamform(.clk_i(clk_i),
                             .beamA_i(beams_delayed[beam_idx + 0]), 
                             .beamB_i(beams_delayed[beam_idx + 1]),

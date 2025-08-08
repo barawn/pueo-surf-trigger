@@ -22,6 +22,8 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
         output [NBEAMS-1:0] trigger_o,
         output trigger_count_done_o
     );
+    
+    localparam ZERO_IS_FAKE = (NBEAMS == 2) ? "TRUE" : "FALSE";
 
     // OK - the L1 space consists of the thresholds
     // and scalers. We split them up here, but mangle
@@ -72,7 +74,9 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
     wire [1:0][NBEAMS-1:0] trig_stretch;
                                            
     // this can be aclk.
-    wb_thresholds #(.NBEAMS(NBEAMS))
+    wb_thresholds #(.NBEAMS(NBEAMS),
+                    .WBCLKTYPE(WBCLKTYPE),
+                    .ACLKTYPE(CLKTYPE))
         u_thresh_wb( .wb_clk_i(wb_clk_i),
                      `CONNECT_WBS_IFM( wb_ , thresh_ ),
                      .scal_bank_i(scal_bank),
@@ -84,7 +88,8 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
                      .thresh_update_o(thresh_update));
     
     // this MUST be tclk
-    beamform_trigger_v2 #(.NBEAMS(NBEAMS))
+    beamform_trigger_v2 #(.NBEAMS(NBEAMS),
+                          .ZERO_IS_FAKE(ZERO_IS_FAKE))
         u_beam_trigger( .clk_i(tclk),
                         .data_i(dat_i),
                         .thresh_i(thresh_dat),
