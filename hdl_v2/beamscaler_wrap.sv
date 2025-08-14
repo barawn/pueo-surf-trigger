@@ -16,10 +16,19 @@
 // According to the XPM docs scal_dat_o should 
 // be captured 2 clocks after scal_rd_i.
 // Who knows, though.
+//
+// UPDATED BEAMSCALER MODULE:
+// - Instead of splitting the subthresholds off, we instead group
+//   them with their primary. This means that we read the same
+//   addresses between the primary and subthreshold, and for the v2
+//   in python we return a tuple rather than just a single.
+//   Splitting the subthresholds off is way harder and more awkward
+//   anyway.
 module beamscaler_wrap #(parameter NBEAMS = 2,
                          localparam NSCALERS = 2,
                          parameter IFCLKTYPE = "NONE",
-                         parameter WBCLKTYPE = "NONE")(
+                         parameter WBCLKTYPE = "NONE",
+                         parameter DEBUG = "FALSE")(
                          
                          input ifclk_i,
                          // These need to be ordered (low half = real)
@@ -37,46 +46,10 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
                          output [31:0] scal_dat_o,
                          output write_bank_o
                          );
-
-    // OK - HERE'S THE ISSUE:
-    // We want to split up the scalers between real and subthreshold.
-    // We want them to be split up address-wise quite a bit.
-    // That way if the number of *beams* changes, the addressing
-    // doesn't. Subthresholds just start again at a high point.
-    //
-    // The problem with this is that because of the way we update,
-    // we always update 4 scaler values at a time. So suppose NBEAMS = 5.
-    // We have 10 scalers. So we need 3 quad beamscalers. But if we arrange
-    // them
-    // x x 9 8
-    // 7 6 5 4
-    // 3 2 1 0
-    // we mix the reals (0/1/2/3/4) and the subthresholds (5/6/7/8).
-    // So instead what we need to do is find the nearest power of 4.
-    // That way we can split up the scalers into the high and low set
-    // trivially, and if the scalers are mapped odd/even it's an easy
-    // remap. So now for 10, we would have
-    // 3: x x x 9  addr = 3 (really RAM addr = 0x84 WB addr = 0x204)
-    // 2: x x x 4  addr = 2 (really RAM addr = 0x04 WB addr = 0x4)
-    // 1: 8 7 6 5  addr = 1 (really RAM addr = 0x80 WB addr = 0x200)
-    // 0: 3 2 1 0  addr = 0 (really RAM addr = 0x00 WB addr = 0x0)
-    // This could house up to 8 beams. For NBEAMS = 11 (22 scalers) we have
-    // 5: X 212019      GROUP = 2 NREMAINING = 3
-    // 4: X 109 8       GROUP = 2 NREMAINING = 3
-    // 3: 18171615      GROUP = 1 NREMAINING = 4
-    // 2: 7 6 5 4       GROUP = 1 NREMAINING = 4
-    // 1: 14131211      GROUP = 0 NREMAINING = 4
-    // 0: 3 2 1 0       GROUP = 0 NREMAINING = 4
-    // So what we want to do is NBEAMS/4 + (NBEAMS%4 != 0) ? 1 : 0;
-    // And then as we loop through, if i is even, we check:
-    // GROUP = i & 'hFE
-    // BASE = GROUP*2 + (i%2 == 1) ? NBEAMS : 0
-    // NREMAINING = (NBEAMS - GROUP*2) > 3 ? 4 : (NBEAMS-GROUP*2)
-    // inputs = { {(4-NREMAINING){1'b0}}, (trig_in[BASE +: NREMAINING]) }
-    
-    // for 46 this will be 24
-    localparam NUM_QSCAL = 2*(NBEAMS/4 + ((NBEAMS%4 != 0) ? 1 : 0));
-    
+    // With the subthresholds now integrated, we don't need multiples of 4
+    // anymore - we need NBEAMS/2 rounded up.
+    localparam NUM_QSCAL = (NBEAMS/2) + (NBEAMS%2);
+ 
     // we will do sleaze, and the input will be
     // i/2 and the output will be (i/2+1)%NUM_QSCAL.
     // This actually loops it around but the first beamscaler
@@ -110,11 +83,10 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
     // we have 512 x 72, but really 512 x 64.
     // We write 2x16 per clock, and the byte enables select which bank is being updated.
     // On the read side, the active read bank is the low address.
-    reg [8:0] scaler_addr = {9{1'b0}};
-    
-    // flip the subthresholds into the upper space
-    wire [7:0] scaler_addr_remap = { scaler_addr[0],
-                                     scaler_addr[1 +: 7] };
+    reg [7:0] scaler_addr = {8{1'b0}};
+    wire [8:0] scaler_addr_minus_one = scaler_addr - 1;
+    wire [7:0] scaler_addr_remap = {scaler_addr[6:0], (state==DATA_SHIFT_A || state == DATA_SHIFT_B)};
+
     reg active_write_bank = 0;
 
     reg [1:0] scaler_write = {2{1'b0}};
@@ -167,17 +139,18 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
         else if (timer_i) timer_complete <= `DLYFF 1'b1;
         else if (state == IDLE_A || state == IDLE_B) timer_complete <= `DLYFF 1'b0;
 
-        update_done <= `DLYFF (state == DATA_SHIFT_A || state == DATA_SHIFT_B) && scaler_addr[7];
+        update_done <= `DLYFF (state == DATA_SHIFT_A || state == DATA_SHIFT_B) && scaler_addr_minus_one[8];
         
         // just transition at the idle points. The read banks are the opposite
-        // of this.
+        // of this. When we hit the IDLE_A/IDLE_B states, we've fully updated
+        // the *other* bank in RAM and in can be read from.
         if (state == IDLE_A) active_write_bank <= `DLYFF 0;
         else if (state == IDLE_B) active_write_bank <= `DLYFF 1;
         
         if (state == IDLE_A || state == IDLE_B)
-            scaler_addr <= `DLYFF NUM_QSCAL-1;
-        else if (state == DSP_SHIFT_A || state == DSP_SHIFT_B)
-            scaler_addr <= `DLYFF scaler_addr[7:0] - 1;
+            scaler_addr <= `DLYFF NUM_QSCAL;
+        else if (state == DATA_SHIFT_A || state == DATA_SHIFT_B)
+            scaler_addr <= `DLYFF scaler_addr_minus_one;
             
         if (wb_rst_i) state <= `DLYFF RESET;
         else begin
@@ -188,14 +161,14 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
                 PREP_B: state <= `DLYFF COMPUTE_A_0;
                 COMPUTE_A_0: state <= `DLYFF COMPUTE_A_1;
                 COMPUTE_A_1: state <= `DLYFF DATA_SHIFT_A;
-                DATA_SHIFT_A: if (scaler_addr[8]) state <= `DLYFF IDLE_B;
+                DATA_SHIFT_A: if (scaler_addr_minus_one[8]) state <= `DLYFF IDLE_B;
                               else state <= `DLYFF DSP_SHIFT_A;
                 DSP_SHIFT_A: state <= `DLYFF DATA_SHIFT_A;
                 IDLE_B: if (timer_complete) state <= `DLYFF PREP_A;
                 PREP_A: state <= `DLYFF COMPUTE_B_0;
                 COMPUTE_B_0: state <= `DLYFF COMPUTE_B_1;
                 COMPUTE_B_1: state <= `DLYFF DATA_SHIFT_B;
-                DATA_SHIFT_B: if (scaler_addr[8]) state <= `DLYFF IDLE_A;
+                DATA_SHIFT_B: if (scaler_addr_minus_one[8]) state <= `DLYFF IDLE_A;
                               else state <= `DLYFF DSP_SHIFT_B;
                 DSP_SHIFT_B: state <= `DLYFF DATA_SHIFT_B;
             endcase
@@ -233,13 +206,37 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
 
     generate
         genvar i;
+        if (DEBUG == "TRUE") begin : DBG
+            wire [1:0] trig_flag;
+            wire [1:0] subthresh_flag;
+            flag_sync u_trig0_flag(.in_clkA(count_i[0]),.out_clkB(trig_flag[0]),
+                                   .clkA(ifclk_i),.clkB(wb_clk_i));
+            flag_sync u_trig1_flag(.in_clkA(count_i[1]),.out_clkB(trig_flag[1]),
+                                   .clkA(ifclk_i),.clkB(wb_clk_i));
+            flag_sync u_subt0_flag(.in_clkA(count_i[NBEAMS]),.out_clkB(subthresh_flag[0]),
+                                   .clkA(ifclk_i),.clkB(wb_clk_i));
+            flag_sync u_subt1_flag(.in_clkA(count_i[NBEAMS+1]),.out_clkB(subthresh_flag[1]),
+                                   .clkA(ifclk_i),.clkB(wb_clk_i));
+                                   
+            beamscaler_ila u_ila(.clk(wb_clk_i),
+                                 .probe0(state),
+                                 .probe1(dsp_capture_A),
+                                 .probe2(dsp_capture_B),
+                                 .probe3(trig_flag),
+                                 .probe4(subthresh_flag));
+        end
         for (i=0;i<NUM_QSCAL;i=i+1) begin : BSC
-            localparam GROUP = i & 'hFE;
-            localparam BASE = GROUP*2 + (i%2 == 1) ? NBEAMS : 0;
-            localparam NREMAINING = (NBEAMS - GROUP*2) > 3 ? 4 : (NBEAMS-GROUP*2);
-            
-            wire [3:0] count_in = (NREMAINING == 4) ? count_i[BASE +: 4] :
-                                      { {(4-NREMAINING){1'b0}}, count_i[BASE +: NREMAINING] };
+            // QSCAL 0 gets: count_i[NBEAMS+1], count_i[1], count_i[NBEAMS], count_i[0]
+            wire [3:0] count_in;
+            assign count_in[0] = count_i[2*i];
+            assign count_in[1] = count_i[NBEAMS+2*i];
+            if (2*i+1 >= NBEAMS) begin : TAIL
+                assign count_in[2] = 1'b0;
+                assign count_in[3] = 1'b0;
+            end else begin : FULL
+                assign count_in[2] = count_i[2*i+1];
+                assign count_in[3] = count_i[NBEAMS+2*i+1];
+            end
             wire [48*2-1:0] dsp_out;
             beamscaler #(.CASCADE(i==0 ? "FALSE" : "TRUE"),
                          .IFCLKTYPE(IFCLKTYPE),
