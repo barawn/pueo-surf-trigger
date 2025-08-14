@@ -112,6 +112,7 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
     assign trigger_o = trig_stretch[0];
 
     beamscaler_wb_wrap #(.NBEAMS(NBEAMS),
+                         .DEBUG("TRUE"),
                          .IFCLKTYPE(IFCLKTYPE),
                          .WBCLKTYPE(WBCLKTYPE))
         u_scalers(.wb_clk_i(wb_clk_i),

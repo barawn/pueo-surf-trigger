@@ -12,6 +12,7 @@
 `include "interfaces.vh"
 module beamscaler_wb_wrap #(parameter NBEAMS = 46,
                             parameter NSCALERS = 2,
+                            parameter DEBUG = "FALSE",
                             parameter IFCLKTYPE = "NONE",
                             parameter WBCLKTYPE = "NONE")(
         input wb_clk_i,
@@ -33,7 +34,7 @@ module beamscaler_wb_wrap #(parameter NBEAMS = 46,
     wire [NBEAMS*NSCALERS-1:0] scaler_in;
     generate
         genvar i;
-        for (i=0;i<NBEAMS*NSCALERS-1;i=i+1) begin : SCCONV
+        for (i=0;i<NBEAMS*NSCALERS;i=i+1) begin : SCCONV
             // we saturate at a stupid low occupancy level so this will turn on
             // when a signal's been on for 96 clocks = nearly 1 microsecond
             reg count_rereg = 0;
@@ -83,7 +84,8 @@ module beamscaler_wb_wrap #(parameter NBEAMS = 46,
     // bit 2 adr 0                   
     beamscaler_wrap #(.NBEAMS(NBEAMS),
                       .IFCLKTYPE(IFCLKTYPE),
-                      .WBCLKTYPE(WBCLKTYPE))
+                      .WBCLKTYPE(WBCLKTYPE),
+                      .DEBUG(DEBUG))
         u_bs( .ifclk_i(ifclk_i),
               .count_i(scaler_in),
               .timer_i(timer_i),
