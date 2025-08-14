@@ -144,6 +144,8 @@ module wb_thresholds #(parameter WBCLKTYPE = "NONE",
             if (wb_sel_i[0]) scaler_reset <= wb_dat_i[0];
         end
 
+        update_finished_wbclk <= { update_finished_wbclk[1:0], update_finished };
+
         scaler_write_bank <= scal_bank_i;
     end
 
