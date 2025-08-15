@@ -26,9 +26,9 @@ module beamscaler_tb;
         else timer_count <= timer_count - 1;
     end
     // just dumb testing at the moment    
-    beamscaler_wrap #(.NBEAMS(6))
+    beamscaler_wrap #(.NBEAMS(2))
             uut(.ifclk_i(ifclk),
-                .count_i(count_in),
+                .count_i(count_in[3:0]),
                 .timer_i(timer),
                 .done_o(timer_done),
                 .wb_clk_i(wbclk),
@@ -52,7 +52,7 @@ module beamscaler_tb;
         #100;
         @(posedge ifclk);
         #0.1 count_in[0] = 1;
-             count_in[5] = 1;
+             count_in[2] = 1;
         @(posedge ifclk);
         #0.1 count_in[0] = 0;   // beam 0 scaler 0 = 1
         @(posedge ifclk);             
