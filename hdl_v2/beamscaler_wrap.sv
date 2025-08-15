@@ -40,7 +40,7 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
                          input wb_clk_i,
                          input wb_rst_i,
                          // 96 scalers needs 7 bit addr, we make it 8 bits
-                         // for safety and split on the top bit
+                         // for safety
                          input scal_rd_i,
                          input [7:0] scal_adr_i,
                          output [31:0] scal_dat_o,
