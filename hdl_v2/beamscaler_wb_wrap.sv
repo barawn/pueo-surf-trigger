@@ -71,17 +71,7 @@ module beamscaler_wb_wrap #(parameter NBEAMS = 46,
         endcase
     end
 
-    // ensure subthresholds are split off at the top of the space
-    // bit 11 is unused
-    // bit 10 adr 7
-    // bit 9 is unused
-    // bit 8 adr 6
-    // bit 7 adr 5
-    // bit 6 adr 4
-    // bit 5 adr 3
-    // bit 4 adr 2
-    // bit 3 adr 1
-    // bit 2 adr 0                   
+    // address is just the bottom 8 bits now
     beamscaler_wrap #(.NBEAMS(NBEAMS),
                       .IFCLKTYPE(IFCLKTYPE),
                       .WBCLKTYPE(WBCLKTYPE),
@@ -94,7 +84,7 @@ module beamscaler_wb_wrap #(parameter NBEAMS = 46,
               .wb_clk_i(wb_clk_i),
               .wb_rst_i(rst_i),
               .scal_rd_i(state == READ),
-              .scal_adr_i({wb_adr_i[10],wb_adr_i[2 +: 7]}),
+              .scal_adr_i(wb_adr_i[2 +: 8]),
               .scal_dat_o(wb_dat_o));
     
     assign wb_ack_o = (state == ACK);
