@@ -95,7 +95,7 @@ module beamform_trigger_v2b #(parameter FULL = "TRUE",
 //                                                                        beam_contents_dummy;
 
     // Sample storage array.    
-    reg [SAMPLE_STORE_DEPTH*NSAMP*NBITS-1:0] sample_store[NCHAN-1:0];
+    wire [SAMPLE_STORE_DEPTH*NSAMP*NBITS-1:0] sample_store[NCHAN-1:0];
     wire [2:0][NSAMP*NBITS-1:0] triplets_delayed[NTRIPLETS-1:0];
     wire [1:0][NSAMP*NBITS-1:0] doublets_delayed[NDOUBLETS-1:0];
 
@@ -168,16 +168,16 @@ module beamform_trigger_v2b #(parameter FULL = "TRUE",
         end
         // RIGHT NOW THE SAMPLES RUN IN REVERSE....
         for(chan_idx=0; chan_idx<NCHAN; chan_idx++) begin : CS
-            for(clock_idx=SAMPLE_STORE_DEPTH-2; clock_idx>=0;clock_idx--) begin :CCS
-                always @(posedge clk_i) begin: SHIFT_SAMPLE_STORE
-                    sample_store[chan_idx][clock_idx*NSAMP*NBITS +: NSAMP*NBITS] <= sample_store[chan_idx][(clock_idx+1)*NSAMP*NBITS +: NSAMP*NBITS]; // Shift over
-                end
-            end
-            always @(posedge clk_i) begin: NEW_SAMPLE_STORE
-                sample_store[chan_idx][(SAMPLE_STORE_DEPTH-1)*NSAMP*NBITS +: NSAMP*NBITS] <= data_i[chan_idx]; // New one goes in
-            end
-        end 
-
+            // Partition Lucas's storage logic into its own module
+            // so we can reuse it for the sub-beam storage later
+            sample_store #(.PIPE("TRUE"),
+                           .SAMPLE_STORE_DEPTH(SAMPLE_STORE_DEPTH),
+                           .NBITS(NBITS),
+                           .NSAMP(NSAMP))
+                u_store(.clk_i(clk_i),
+                        .dat_i(data_i[chan_idx]),
+                        .store_o(sample_store[chan_idx]));
+        end
 
         for (t=0;t<NTRIPLETS;t=t+1) begin : T
             localparam int triplet_delay[0:2] = (FULL == "TRUE") ? triplet_delay_full[t] :
