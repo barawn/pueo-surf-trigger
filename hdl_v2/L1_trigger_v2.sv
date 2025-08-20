@@ -22,6 +22,8 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
         output [NBEAMS-1:0] trigger_o,
         output trigger_count_done_o
     );
+
+    localparam OPTIMIZED = "TRUE";
     
     localparam ZERO_IS_FAKE = (NBEAMS == 2) ? "TRUE" : "FALSE";
 
@@ -88,15 +90,27 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
                      .thresh_update_o(thresh_update));
     
     // this MUST be tclk
-    beamform_trigger_v2 #(.NBEAMS(NBEAMS),
-                          .ZERO_IS_FAKE(ZERO_IS_FAKE))
-        u_beam_trigger( .clk_i(tclk),
-                        .data_i(dat_i),
-                        .thresh_i(thresh_dat),
-                        .thresh_wr_i(thresh_wr),
-                        .thresh_update_i(thresh_update),
-                        .trigger_o(triggers));
-    
+    generate
+        if (OPTIMIZED == "TRUE") begin : O
+            beamform_trigger_v2b #(.FULL(NBEAMS == 2 ? "FALSE" : "TRUE"),
+                                   .DEBUG(NBEAMS == 2 ? "TRUE" : "FALSE"))
+                u_beam_trigger( .clk_i(tclk),
+                                .data_i(dat_i),
+                                .thresh_i(thresh_dat),
+                                .thresh_wr_i(thresh_wr),
+                                .thresh_update_i(thresh_update),
+                                .trigger_o(triggers));
+        end else begin : N
+            beamform_trigger_v2 #(.NBEAMS(NBEAMS),
+                                  .ZERO_IS_FAKE(ZERO_IS_FAKE))
+                u_beam_trigger( .clk_i(tclk),
+                                .data_i(dat_i),
+                                .thresh_i(thresh_dat),
+                                .thresh_wr_i(thresh_wr),
+                                .thresh_update_i(thresh_update),
+                                .trigger_o(triggers));
+        end            
+    endgenerate
     // Now we want to cross the triggers from aclk -> ifclk.
     // This is an old module we reuse, hence NBEAMS*2 to cover
     // the subthresholds.
