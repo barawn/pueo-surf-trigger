@@ -27,21 +27,23 @@
 `define BEAM_CONTENTS_DUMMY     '{  '{0,1,0},       \
                                     '{2,3,1} }
 
-`define TRIPLET_ADDER_TOTAL 3
-`define TRIPLET_ADDER_DELAYS    '{  '{4,2,0},       \
-                                    '{4,2,0},       \
-                                    '{5,3,1} }
-`define TRIPLET_ADDER_INDICES   '{  '{1,2,3},       \
-                                    '{5,6,7},       \
-                                    '{5,6,7} }
+`include "optimized_beams.vh"
 
-`define DOUBLET_ADDER_TOTAL 2
-`define DOUBLET_ADDER_DELAYS '{ '{1,4},     \
-                                '{0,3} }
+//`define TRIPLET_ADDER_TOTAL 3
+//`define TRIPLET_ADDER_DELAYS    '{  '{4,2,0},       \
+//                                    '{4,2,0},       \
+//                                    '{5,3,1} }
+//`define TRIPLET_ADDER_INDICES   '{  '{1,2,3},       \
+//                                    '{5,6,7},       \
+//                                    '{5,6,7} }
 
-`define NUM_BEAM 2
-`define BEAM_CONTENTS '{ '{0,1,0},          \
-                         '{0,2,1} }
+//`define DOUBLET_ADDER_TOTAL 2
+//`define DOUBLET_ADDER_DELAYS '{ '{1,4},     \
+//                                '{0,3} }
+
+//`define NUM_BEAM 2
+//`define BEAM_CONTENTS '{ '{0,1,0},          \
+//                         '{0,2,1} }
 
 module beamform_trigger_v2b #(parameter FULL = "TRUE",
                               parameter DEBUG = "FALSE",
@@ -83,14 +85,14 @@ module beamform_trigger_v2b #(parameter FULL = "TRUE",
     localparam NTRIPLETS = (FULL == "TRUE") ? `TRIPLET_ADDER_TOTAL : `TRIPLET_DUMMY_TOTAL;
     localparam NDOUBLETS = (FULL == "TRUE") ? `DOUBLET_ADDER_TOTAL : `DOUBLET_DUMMY_TOTAL;
     
-    localparam int triplet_delay [0:NTRIPLETS-1][0:2] = (FULL == "TRUE") ? triplet_delay_full :
-                                                                           triplet_delay_dummy;
-    localparam int triplet_index [0:NTRIPLETS-1][0:2] = (FULL == "TRUE") ? triplet_index_full :
-                                                                           triplet_index_dummy;
-    localparam int doublet_delay [0:NDOUBLETS-1][0:1] = (FULL == "TRUE") ? doublet_delay_full :
-                                                                           doublet_delay_dummy;
-    localparam int beam_contents [0:NBEAMS-1][0:2] = (FULL == "TRUE") ? beam_contents_full :
-                                                                        beam_contents_dummy;
+//    localparam int triplet_delay [0:NTRIPLETS-1][0:2] = (FULL == "TRUE") ? triplet_delay_full :
+//                                                                           triplet_delay_dummy;
+//    localparam int triplet_index [0:NTRIPLETS-1][0:2] = (FULL == "TRUE") ? triplet_index_full :
+//                                                                           triplet_index_dummy;
+//    localparam int doublet_delay [0:NDOUBLETS-1][0:1] = (FULL == "TRUE") ? doublet_delay_full :
+//                                                                           doublet_delay_dummy;
+//    localparam int beam_contents [0:NBEAMS-1][0:2] = (FULL == "TRUE") ? beam_contents_full :
+//                                                                        beam_contents_dummy;
 
     // Sample storage array.    
     reg [SAMPLE_STORE_DEPTH*NSAMP*NBITS-1:0] sample_store[NCHAN-1:0];
@@ -103,16 +105,26 @@ module beamform_trigger_v2b #(parameter FULL = "TRUE",
 
     // this is stupid, only half get connected, but whatever
     wire [47:0] cascade[NBEAMS-1:0];
-    
+
+//    localparam int triplet_delay [0:NTRIPLETS-1][0:2] = (FULL == "TRUE") ? triplet_delay_full :
+//                                                                           triplet_delay_dummy;
+//    localparam int triplet_index [0:NTRIPLETS-1][0:2] = (FULL == "TRUE") ? triplet_index_full :
+//                                                                           triplet_index_dummy;
+//    localparam int doublet_delay [0:NDOUBLETS-1][0:1] = (FULL == "TRUE") ? doublet_delay_full :
+//                                                                           doublet_delay_dummy;
+//    localparam int beam_contents [0:NBEAMS-1][0:2] = (FULL == "TRUE") ? beam_contents_full :
+//                                                                        beam_contents_dummy;    
     generate
         genvar t, t_ch, t_s, d, d_ch, d_s, chan_idx, clock_idx;
-        genvar b;
+        genvar b;        
         for (b=0;b<NBEAMS;b=b+2) begin : B
+            localparam int beam_content[0:2] = (FULL == "TRUE") ? beam_contents_full[b] :
+                                                                  beam_contents_dummy[b];
             int doublet_idx = 
-                (beam_contents[b][2] >= NDOUBLETS) ? NDOUBLETS :
-                                                          beam_contents[b][2];
-            wire [NSAMP*SB_BITS-1:0] tripletA0 = triplets[beam_contents[b][0]];
-            wire [NSAMP*SB_BITS-1:0] tripletB0 = triplets[beam_contents[b][1]];            
+                (beam_content[2] >= NDOUBLETS) ? NDOUBLETS :
+                                                 beam_content[2];
+            wire [NSAMP*SB_BITS-1:0] tripletA0 = triplets[beam_content[0]];
+            wire [NSAMP*SB_BITS-1:0] tripletB0 = triplets[beam_content[1]];            
             wire [NSAMP*SB_BITS-1:0] doublet0 = doublets[doublet_idx];
             
             wire [NSAMP*SB_BITS-1:0] tripletA1;
@@ -124,11 +136,13 @@ module beamform_trigger_v2b #(parameter FULL = "TRUE",
             assign trigger_o[NBEAMS + b + 0] = trigger_out[1];
 
             if (b+1 < NBEAMS) begin : B2
+                localparam int beam_content1[0:2] = (FULL == "TRUE") ? beam_contents_full[b+1] :
+                                                                       beam_contents_dummy[b+1];
                 int doublet1_idx =
-                (beam_contents[b+1][2] >= NDOUBLETS) ? NDOUBLETS :
-                                                       beam_contents[b+1][2];
-                assign tripletA1 = triplets[beam_contents[b+1][0]];
-                assign tripletB1 = triplets[beam_contents[b+1][1]];
+                (beam_content1[2] >= NDOUBLETS) ? NDOUBLETS :
+                                                  beam_content1[2];
+                assign tripletA1 = triplets[beam_content1[0]];
+                assign tripletB1 = triplets[beam_content1[1]];
                 assign doublet1 = doublets[doublet1_idx];                                
                 assign trigger_o[b + 1] = trigger_out[2];
                 assign trigger_o[NBEAMS + b + 1] = trigger_out[3];
@@ -166,9 +180,14 @@ module beamform_trigger_v2b #(parameter FULL = "TRUE",
 
 
         for (t=0;t<NTRIPLETS;t=t+1) begin : T
+            localparam int triplet_delay[0:2] = (FULL == "TRUE") ? triplet_delay_full[t] :
+                                                                   triplet_delay_dummy[t];
+            localparam int triplet_index[0:2] = (FULL == "TRUE") ? triplet_index_full[t] :
+                                                                   triplet_index_dummy[t];                                                                   
+
             for (t_ch=0;t_ch<3;t_ch=t_ch+1) begin : C
-                int t_d = (SAMPLE_STORE_DEPTH-1)*NSAMP - triplet_delay[t][t_ch];
-                assign triplets_delayed[t][t_ch] = sample_store[triplet_index[t][t_ch]][(t_d)*NBITS +: NSAMP*NBITS];
+                int t_d = (SAMPLE_STORE_DEPTH-1)*NSAMP - triplet_delay[t_ch];
+                assign triplets_delayed[t][t_ch] = sample_store[triplet_index[t_ch]][(t_d)*NBITS +: NSAMP*NBITS];
             end
             sub_beam u_tb(.clk_i(clk_i),
                           .chA_i(triplets_delayed[t][0]),
@@ -177,6 +196,8 @@ module beamform_trigger_v2b #(parameter FULL = "TRUE",
                           .dat_o(triplets[t]));
         end
         for (d=0;d<NDOUBLETS;d=d+1) begin : D
+            localparam int doublet_delay[0:1] = (FULL == "TRUE") ? doublet_delay_full[d] :
+                                                                   doublet_delay_dummy[d];
             for (d_ch=0;d_ch<2;d_ch=d_ch+1) begin : C
                 localparam idx = (d_ch == 1) ? 4 : 0;
                 int a_d = (SAMPLE_STORE_DEPTH-1)*NSAMP - doublet_delay[d][d_ch];                
