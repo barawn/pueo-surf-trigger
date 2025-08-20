@@ -97,24 +97,34 @@ module dual_pueo_beamform_v2
                             .O(beamB[jj])); // Sum of the delayed beams for each (phase offset) sample
             end else begin : PAIN
                 // The postadd version doesn't need pipeline regs.
-                wire [2:0][(NBITS+2)-1:0] A_stage1 = beamA_i;
-                wire [2:0][(NBITS+2)-1:0] B_stage1 = beamB_i;
+                localparam ADDER0_BASE = (NBITS+2)*jj;
+                localparam ADDER1_BASE = (NBITS+2)*NSAMP + (NBITS+2)*jj;
+                localparam ADDER2_BASE = 2*(NBITS+2)*NSAMP + (NBITS+2)*jj;
+                
+                // To grab the inputs
+                wire [(NBITS+2)-1:0] A_adder0 = beamA_i[ADDER0_BASE +: (NBITS+2)];
+                wire [(NBITS+2)-1:0] A_adder1 = beamA_i[ADDER1_BASE +: (NBITS+2)];
+                wire [(NBITS+2)-1:0] A_adder2 = beamA_i[ADDER2_BASE +: (NBITS+2)];
+
+                wire [(NBITS+2)-1:0] B_adder0 = beamB_i[ADDER0_BASE +: (NBITS+2)];
+                wire [(NBITS+2)-1:0] B_adder1 = beamB_i[ADDER1_BASE +: (NBITS+2)];
+                wire [(NBITS+2)-1:0] B_adder2 = beamB_i[ADDER2_BASE +: (NBITS+2)];
                 
                 ternary_add_sub_prim #(.input_word_size(NBITS+2),
                                        .is_signed(1'b0))
                     u_stage2A(.clk_i(clk_i),
                               .rst_i(1'b0),
-                              .x_i(A_stage1[0]),
-                              .y_i(A_stage1[1]),
-                              .z_i(A_stage1[2]),
+                              .x_i(A_adder0),
+                              .y_i(A_adder1),
+                              .z_i(A_adder2),
                               .sum_o( beamA[jj] ));
                 ternary_add_sub_prim #(.input_word_size(NBITS+2),
                                        .is_signed(1'b0))
                     u_stage2B(.clk_i(clk_i),
                               .rst_i(1'b0),
-                              .x_i(B_stage1[0]),
-                              .y_i(B_stage1[1]),
-                              .z_i(B_stage1[2]),
+                              .x_i(B_adder0),
+                              .y_i(B_adder1),
+                              .z_i(B_adder2),
                               .sum_o( beamB[jj] ));                                                                     
             end
             
