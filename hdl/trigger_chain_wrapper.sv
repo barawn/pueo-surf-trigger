@@ -39,6 +39,7 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
     );
     localparam FILTER_TYPE = "HDL";
     localparam HDL_FILTER_VERSION = "SYSTOLIC";
+    localparam MATCHED_FILTER = "V1";
     
     // QUALITY OF LIFE FUNCTIONS
 
@@ -504,14 +505,23 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                              .out_o(lpf_out));
             end
         end            
+        if (MATCHED_FILTER == "V2") begin : V2
+            matched_filter_v2 u_matched_filter(
+                .aclk(aclk),
+                .data_i(pipe_to_filter),
+                .data_o(match_out)
+            );
+        end else begin : V1
+            // Matched Filter    
+            matched_filter u_matched_filter(
+                .aclk(aclk),
+                .data_i(pipe_to_filter),
+                .data_o(match_out)
+            );
+        end
     endgenerate
-    // Matched Filter
-    matched_filter u_matched_filter(
-        .aclk(aclk),
-        .data_i(pipe_to_filter),
-        .data_o(match_out)
-    );
-
+    
+    
 
 
     // Biquads
