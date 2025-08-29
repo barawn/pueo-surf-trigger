@@ -70,7 +70,7 @@ module beamform_trigger_v2b #(parameter FULL = "TRUE",
 
     // Beams are constructed from 2 triplets and optionally a doublet. If the doublet index is
     // 255 (really greater than DOUBLET_ADDER_TOTAL) this indicates no doublet.
-    localparam int beam_contents_full [0:NBEAMS-1][0:2] = `BEAM_CONTENTS;
+    localparam int beam_contents_full [0:`NUM_BEAM-1][0:2] = `BEAM_CONTENTS;
 
     // Triplets need indices, they move a bit.
     localparam int triplet_delay_dummy [0:(`TRIPLET_DUMMY_TOTAL)-1][0:2] = `TRIPLET_DUMMY_DELAYS;
@@ -80,7 +80,7 @@ module beamform_trigger_v2b #(parameter FULL = "TRUE",
 
     // Beams are constructed from 2 triplets and optionally a doublet. If the doublet index is
     // 255 (really greater than DOUBLET_ADDER_TOTAL) this indicates no doublet.
-    localparam int beam_contents_dummy [0:NBEAMS-1][0:2] = `BEAM_CONTENTS;
+    localparam int beam_contents_dummy [0:1][0:2] = `BEAM_CONTENTS_DUMMY;
 
     localparam NTRIPLETS = (FULL == "TRUE") ? `TRIPLET_ADDER_TOTAL : `TRIPLET_DUMMY_TOTAL;
     localparam NDOUBLETS = (FULL == "TRUE") ? `DOUBLET_ADDER_TOTAL : `DOUBLET_DUMMY_TOTAL;
