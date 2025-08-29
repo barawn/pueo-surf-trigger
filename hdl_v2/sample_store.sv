@@ -31,6 +31,6 @@ module sample_store #(parameter NBITS=5,
         always @(posedge clk_i) begin : NEW_SAMPLE_STORE
             sample_store[(REG_DEPTH-1)*NSAMP*NBITS +: NSAMP*NBITS] <= dat_i;
         end
-        assign store_o[(REG_DEPTH-1)*NSAMP*NBITS +: NSAMP*NBITS] = sample_store[(REG_DEPTH-1)*NSAMP*NBITS];
+        assign store_o[(REG_DEPTH-1)*NSAMP*NBITS +: NSAMP*NBITS] = sample_store[(REG_DEPTH-1)*NSAMP*NBITS +: NSAMP*NBITS];
     endgenerate    
 endmodule
