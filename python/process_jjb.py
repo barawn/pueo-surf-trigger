@@ -13,8 +13,9 @@ def transform_adders( adders, delayName, offsetName, beams, verbose=True):
         selected = list(filter(lambda x : (x[delayName] == adder), beams))
         offsets = [ x[offsetName] for x in selected ]
         minOffset = min(offsets)
+        maxOffset = max(offsets)
         if verbose:
-            print(f'Adder {adder} used in {len(selected)} beams: min offset {minOffset}')
+            print(f'Adder {adder} used in {len(selected)} beams: min/max offsets {minOffset} / {maxOffset}')
         newAdder = tuple(x+minOffset for x in adder)
         for b in selected:
             b[offsetName] -= minOffset
@@ -71,12 +72,16 @@ if __name__ == '__main__':
     maxLeft = max(itertools.chain(*transformedLeft))
     maxRight = max(itertools.chain(*transformedRight))
     maxTop = max(itertools.chain(*transformedTop))
+
+    maxLeftOffset = max([ b['LeftOffset'] for b in beams ])
+    maxRightOffset = max([ b['RightOffset'] for b in beams ])
+    maxTopOffset = max([ b['TopOffset'] for b in beams ])
     
-    print(f'Transformed left adders (max delay {maxLeft}):')
+    print(f'Transformed left adders (max delay {maxLeft} / max offset {maxLeftOffset}):')
     print(transformedLeft)
-    print(f'Transformed right adders (max delay {maxRight}):')
+    print(f'Transformed right adders (max delay {maxRight} / max offset {maxRightOffset}):')
     print(transformedRight)
-    print(f'Transformed top adders (max delay {maxTop}):')
+    print(f'Transformed top adders (max delay {maxTop} / max offset {maxTopOffset}):')
     print(transformedTop)
 
     maxAll = max((maxLeft, maxRight, maxTop))
@@ -89,8 +94,17 @@ if __name__ == '__main__':
     # (the extra is for the undelayed inputs)
     maxDepth = maxAll//8 + 2
     print(f'Maximum sample delay is {maxAll} - sample store depth is {maxDepth}')
+    maxLeftDepth = maxLeftOffset//8 + 2 if maxLeftOffset > 0 else 1
+    print(f'Max left adder offset is {maxLeftOffset} - left store depth is {maxLeftDepth}')
+    maxRightDepth = maxLeftOffset//8 + 2 if maxRightOffset > 0 else 1
+    print(f'Max right adder offset is {maxRightOffset} - right store depth is {maxRightDepth}')
+    maxTopDepth = maxTopOffset//8 + 2 if maxTopOffset > 0 else 1
+    print(f'Max top adder offset is {maxTopOffset} - top store depth is {maxTopDepth}')
     
-    params['SAMPLE_DEPTH'] = maxDepth
+    params['SAMPLE_STORE_DEPTH'] = maxDepth
     params['LEFT_ADDERS'] = len(transformedLeft)
+    params['LEFT_STORE_DEPTH'] = maxLeftDepth
     params['RIGHT_ADDERS'] = len(transformedRight)
+    params['RIGHT_STORE_DEPTH'] = maxRightDepth
     params['TOP_ADDERS'] = len(transformedTop)
+    params['TOP_STORE_DEPTH'] = maxTopDepth
