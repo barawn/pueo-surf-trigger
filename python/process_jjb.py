@@ -38,17 +38,19 @@ def transform_adders( adders, delayName, offsetName, beams, verbose=True):
         transformed.append(newAdder)
     return transformed
 
-def sv_string(k, v):
+def sv_string(k, v, type_name=None):
     def print_to_string(*args, **kwargs):
         with io.StringIO() as output:
             print(*args, file=output, **kwargs)
             return output.getvalue()
-    
+
+    type_name_string = type_name if type_name is not None else ''
+        
     if type(v) == int:
-        return f'\tlocalparam {k} = {v};'
+        return f'\tlocalparam {type_name_string} {k} = {v};'
     elif type(v) == list:
         l = len(v)
-        s = f'\tlocalparam {k} [0:{l-1}]'
+        s = f'\tlocalparam {type_name_string} {k} [0:{l-1}]'
         if type(v[0]) == tuple:
             s += f'[0:{len(v[0])-1}] = \'{{\n'
             first = True
@@ -220,7 +222,7 @@ if __name__ == '__main__':
         print('package pueo_beams;', file=f)
         
         for k, v in params.items():
-            print(sv_string(k,v), file=f)
+            print(sv_string(k,v, type_name='int'), file=f)
             print('', file=f)
 
         print('endpackage', file=f)

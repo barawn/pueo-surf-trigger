@@ -1,21 +1,21 @@
 package pueo_beams;
-	localparam NUM_BEAM = 48;
+	localparam int NUM_BEAM = 48;
 
-	localparam SAMPLE_STORE_DEPTH = 4;
+	localparam int SAMPLE_STORE_DEPTH = 4;
 
-	localparam LEFT_ADDER_LEN = 7;
+	localparam int LEFT_ADDER_LEN = 7;
 
-	localparam LEFT_STORE_DEPTH = 2;
+	localparam int LEFT_STORE_DEPTH = 2;
 
-	localparam RIGHT_ADDER_LEN = 7;
+	localparam int RIGHT_ADDER_LEN = 7;
 
-	localparam RIGHT_STORE_DEPTH = 2;
+	localparam int RIGHT_STORE_DEPTH = 2;
 
-	localparam TOP_ADDER_LEN = 5;
+	localparam int TOP_ADDER_LEN = 5;
 
-	localparam TOP_STORE_DEPTH = 1;
+	localparam int TOP_STORE_DEPTH = 1;
 
-	localparam META0_INDICES [0:21] = '{
+	localparam int META0_INDICES [0:21] = '{
 		18,
 		19,
 		20,
@@ -40,7 +40,7 @@ package pueo_beams;
 		255 };
 
 
-	localparam META1_INDICES [0:21] = '{
+	localparam int META1_INDICES [0:21] = '{
 		4,
 		5,
 		6,
@@ -65,7 +65,7 @@ package pueo_beams;
 		255 };
 
 
-	localparam META2_INDICES [0:21] = '{
+	localparam int META2_INDICES [0:21] = '{
 		17,
 		18,
 		19,
@@ -90,7 +90,7 @@ package pueo_beams;
 		255 };
 
 
-	localparam META3_INDICES [0:21] = '{
+	localparam int META3_INDICES [0:21] = '{
 		3,
 		4,
 		5,
@@ -115,7 +115,7 @@ package pueo_beams;
 		255 };
 
 
-	localparam META4_INDICES [0:21] = '{
+	localparam int META4_INDICES [0:21] = '{
 		15,
 		16,
 		17,
@@ -140,7 +140,7 @@ package pueo_beams;
 		255 };
 
 
-	localparam META5_INDICES [0:21] = '{
+	localparam int META5_INDICES [0:21] = '{
 		1,
 		2,
 		3,
@@ -165,7 +165,7 @@ package pueo_beams;
 		255 };
 
 
-	localparam META6_INDICES [0:21] = '{
+	localparam int META6_INDICES [0:21] = '{
 		14,
 		15,
 		16,
@@ -190,7 +190,7 @@ package pueo_beams;
 		255 };
 
 
-	localparam META7_INDICES [0:21] = '{
+	localparam int META7_INDICES [0:21] = '{
 		0,
 		1,
 		2,
@@ -215,7 +215,7 @@ package pueo_beams;
 		255 };
 
 
-	localparam LEFT_ADDERS [0:6][0:2] = '{
+	localparam int LEFT_ADDERS [0:6][0:2] = '{
 		'{ 19,21,23 },
 		'{ 9,9,9 },
 		'{ 17,18,20 },
@@ -225,7 +225,7 @@ package pueo_beams;
 		'{ 11,11,12 } };
 
 
-	localparam RIGHT_ADDERS [0:6][0:2] = '{
+	localparam int RIGHT_ADDERS [0:6][0:2] = '{
 		'{ 16,18,20 },
 		'{ 10,10,10 },
 		'{ 15,16,18 },
@@ -235,7 +235,7 @@ package pueo_beams;
 		'{ 12,12,13 } };
 
 
-	localparam TOP_ADDERS [0:4][0:1] = '{
+	localparam int TOP_ADDERS [0:4][0:1] = '{
 		'{ 0,1 },
 		'{ 0,0 },
 		'{ 2,0 },
@@ -243,7 +243,7 @@ package pueo_beams;
 		'{ 1,0 } };
 
 
-	localparam BEAM_INDICES [0:47][0:2] = '{
+	localparam int BEAM_INDICES [0:47][0:2] = '{
 		'{ 1,1,3 },
 		'{ 1,1,3 },
 		'{ 1,1,0 },
@@ -294,7 +294,7 @@ package pueo_beams;
 		'{ 4,4,255 } };
 
 
-	localparam BEAM_LEFT_OFFSETS [0:47] = '{
+	localparam int BEAM_LEFT_OFFSETS [0:47] = '{
 		4,
 		5,
 		4,
@@ -345,7 +345,7 @@ package pueo_beams;
 		0 };
 
 
-	localparam BEAM_RIGHT_OFFSETS [0:47] = '{
+	localparam int BEAM_RIGHT_OFFSETS [0:47] = '{
 		0,
 		2,
 		2,
@@ -396,7 +396,7 @@ package pueo_beams;
 		2 };
 
 
-	localparam BEAM_TOP_OFFSETS [0:47] = '{
+	localparam int BEAM_TOP_OFFSETS [0:47] = '{
 		0,
 		0,
 		0,
