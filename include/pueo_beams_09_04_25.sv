@@ -1,4 +1,6 @@
 package pueo_beams;
+	localparam NUM_BEAM = 48;
+
 	localparam SAMPLE_STORE_DEPTH = 4;
 
 	localparam LEFT_ADDER_LEN = 7;
