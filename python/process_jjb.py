@@ -2,10 +2,24 @@ import pickle
 import argparse
 import itertools
 import io
+from pprint import pprint
 
 def meta_indices( beams, mask ):
-    """ finish this later """
+    """ Returns list of beams have the specified bits set in the L2 Mask. """
     return [ b['Index'] for b in filter(lambda x : x['L2Mask'] & mask, beams)]
+
+def beam_adder_indices( beams, left, right, top ):
+    """ Returns the adder (sub-beam) indices for all the beams. 255 = no sub-beam """
+    indices = []
+    for b in beams:
+        leftIndex = left.index(b['LeftDelays'])
+        rightIndex = right.index(b['RightDelays'])
+        if b['TopDelays'] is not None:
+            topIndex = top.index(b['TopDelays'])
+        else:
+            topIndex = 255
+        indices.append( (leftIndex, rightIndex, topIndex) )
+    return indices                               
 
 def transform_adders( adders, delayName, offsetName, beams, verbose=True):
     """ Find the minimum offset of an adder and integrate it into the delay """
@@ -61,12 +75,13 @@ def sv_string(k, v):
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("filename", help="pickled beam file")
-
+    parser.add_argument("infile", help="pickled beam file")
+    parser.add_argument("outfile", help="output SV package")
+    
     args = parser.parse_args()
 
     rawBeams = None
-    with open(args.filename, 'rb') as f:
+    with open(args.infile, 'rb') as f:
         rawBeams = pickle.load(f)
 
     NBEAMS = len(rawBeams)
@@ -166,6 +181,9 @@ if __name__ == '__main__':
     meta7 = meta_indices(beams, 0x80)
     meta7 = meta7+[255]*(22-len(meta7)) if len(meta7) < 22 else meta7
     print(f'Bit 7 has beam indices: {meta7}')    
+
+    print("Determining beam indices.")
+    indices = beam_adder_indices(beams, transformedLeft, transformedRight, transformedTop)
     
     params['SAMPLE_STORE_DEPTH'] = maxDepth
     params['LEFT_ADDER_LEN'] = len(transformedLeft)
@@ -189,11 +207,20 @@ if __name__ == '__main__':
     # The BEAM indices do matter thanks to meta indexing
 
     params['LEFT_ADDERS'] = transformedLeft
-    params['LEFT_OFFSETS'] = leftOffsets
     params['RIGHT_ADDERS'] = transformedRight
-    params['RIGHT_OFFSETS'] = rightOffsets
     params['TOP_ADDERS'] = transformedTop
-    params['TOP_OFFSETS'] = topOffsets
 
-    for k, v in params.items():
-        print(sv_string(k,v))
+    params['BEAM_INDICES'] = indices
+    params['BEAM_LEFT_OFFSETS'] = leftOffsets
+    params['BEAM_RIGHT_OFFSETS'] = rightOffsets
+    params['BEAM_TOP_OFFSETS'] = topOffsets
+
+    with open(args.outfile, 'w') as f:
+        print('package pueo_beams;', file=f)
+        
+        for k, v in params.items():
+            print(sv_string(k,v), file=f)
+            print('', file=f)
+
+        print('endpackage', file=f)
+        
