@@ -13,7 +13,7 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
         input wb_rst_i,
         `TARGET_NAMED_PORTS_WB_IF( wb_ , 13, 32 ),
 
-        input tclk,        
+        input tclk,
         input [NCHAN-1:0][AGC_BITS*NSAMP-1:0] dat_i,
         
         input aclk,
