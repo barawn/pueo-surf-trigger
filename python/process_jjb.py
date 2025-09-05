@@ -184,7 +184,8 @@ if __name__ == '__main__':
 
     print("Determining beam indices.")
     indices = beam_adder_indices(beams, transformedLeft, transformedRight, transformedTop)
-    
+
+    params['NUM_BEAM'] = len(beams)
     params['SAMPLE_STORE_DEPTH'] = maxDepth
     params['LEFT_ADDER_LEN'] = len(transformedLeft)
     params['LEFT_STORE_DEPTH'] = maxLeftDepth
