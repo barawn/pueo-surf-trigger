@@ -86,6 +86,9 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
     wire [NUM_LEFT_STORE*NBITS-1:0] left_store[NUM_LEFT_ADDERS-1:0];
     wire [NUM_RIGHT_STORE*NBITS-1:0] right_store[NUM_LEFT_ADDERS-1:0];
     // there is no top store
+
+    // stupidity but whatever
+    wire [47:0] cascade[NBEAMS-1:0];
     
     generate
         genvar ch, l, r, t, l_ch, r_ch, t_ch, b;
@@ -171,6 +174,10 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
         end
         // and now we build the beams
         for (b=0;b<NBEAMS;b=b+1) begin : BB
+            wire [NSAMP*3*SB_BITS-1:0] beam0;
+            wire [NSAMP*3*SB_BITS-1:0] beam1;
+            wire [3:0] trigger_out;
+            // First beam.        
             localparam int left_index = (FULL == "TRUE") ? BEAM_INDICES[b][0] :
                                                            BEAM_INDICES_DUMMY[b][0];
             localparam int right_index = (FULL == "TRUE") ? BEAM_INDICES[b][1] :
@@ -186,10 +193,72 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
             // This starts at the beginning of the end and we move forward
             // Note that if num left store/num right store are 1, left offset/right offset has to be zero.
             localparam int left_delay = (NUM_LEFT_STORE-1)*NSAMP - left_offset;
-            localparam int right_delay = (NUM_RIGHT_STORE-1)*NSAMP - right_offset;
+            localparam int right_delay = (NUM_RIGHT_STORE-1)*NSAMP - right_offset;            
             
-            wire [NSAMP*SB_BITS-1:0] left_input = left_store[(left_delay)*
-        end        
-    endgenerate 
-                                                          
+            wire [NSAMP*SB_BITS-1:0] left_input = left_store[left_index][(left_delay)*SB_BITS +: NSAMP*SB_BITS];
+            wire [NSAMP*SB_BITS-1:0] right_input = right_store[right_index][(right_delay)*SB_BITS +: NSAMP*SB_BITS];
+            wire [NSAMP*SB_BITS-1:0] top_input;
+            
+            if (top_index < NUM_TOP_ADDERS) begin : RT
+                assign top_input = top_doublets[top_index];
+            end else begin : FT
+                localparam [SB_BITS-1:0] filler = 'd4;
+                assign top_input = {NSAMP{filler}};
+            end
+            
+            assign beam0 = { top_input, right_input, left_input };
+            assign trigger_o[b + 0] = trigger_out[0];
+            assign trigger_o[NBEAMS + b + 0] = trigger_out[1];
+                        
+            // second beam, if needed.
+            if (b+1 < NBEAMS) begin : B2
+                localparam int left_index1 = (FULL == "TRUE") ? BEAM_INDICES[b+1][0] :
+                                                               BEAM_INDICES_DUMMY[b+1][0];
+                localparam int right_index1 = (FULL == "TRUE") ? BEAM_INDICES[b+1][1] :
+                                                                BEAM_INDICES_DUMMY[b+1][1];
+                localparam int top_index1 = (FULL == "TRUE") ? BEAM_INDICES[b+1][2] :
+                                                              BEAM_INDICES_DUMMY[b+1][2];
+    
+                localparam int left_offset1 = (FULL == "TRUE") ? BEAM_LEFT_OFFSETS[b+1] :
+                                                                BEAM_LEFT_OFFSETS_DUMMY[b+1];
+                localparam int right_offset1 = (FULL == "TRUE") ? BEAM_RIGHT_OFFSETS[b+1] :
+                                                                BEAM_RIGHT_OFFSETS_DUMMY[b+1];
+                
+                // This starts at the beginning of the end and we move forward
+                // Note that if num left store/num right store are 1, left offset/right offset has to be zero.
+                localparam int left_delay1 = (NUM_LEFT_STORE-1)*NSAMP - left_offset1;
+                localparam int right_delay1 = (NUM_RIGHT_STORE-1)*NSAMP - right_offset1;
+                
+                wire [NSAMP*SB_BITS-1:0] left_input1 = left_store[left_index1][(left_delay1)*SB_BITS +: NSAMP*SB_BITS];
+                wire [NSAMP*SB_BITS-1:0] right_input1 = right_store[right_index1][(right_delay1)*SB_BITS +: NSAMP*SB_BITS];
+                wire [NSAMP*SB_BITS-1:0] top_input1;
+                if (top_index1 < NUM_TOP_ADDERS) begin : RT
+                    assign top_input1 = top_doublets[top_index1];
+                end else begin : FT
+                    localparam [SB_BITS-1:0] filler = 'd4;
+                    assign top_input1 = {NSAMP{filler}};
+                end
+                assign beam1 = { top_input1, right_input1, left_input1 };
+                assign trigger_o[ b + 1 ] = trigger_out[2];
+                assign trigger_o[ NBEAMS + b + 1 ] = trigger_out[3];
+            end else begin : NB2
+                assign beam1 = {NSAMP*3*SB_BITS{1'b0}};
+                // Don't need to assign the trigger because its index doesn't exist.
+            end
+            
+            dual_pueo_beam_v2 #(.INTYPE("POSTADD"),
+                                .DEBUG(DEBUG),
+                                .CASCADE(b == 0 ? "FALSE" : "TRUE"))
+                u_beamform(.clk_i(clk_i),
+                           .beamA_i(beam0),
+                           .beamB_i(beam1),
+                           .thresh_i(thresh_i),
+                           .thresh_wr_i(thresh_wr_i),
+                           .thresh_update_i(thresh_update_i),
+                           .trigger_o(trigger_out),
+                           .thresh_casc_i(cascade[b]),
+                           .thresh_casc_o(cascade[(b+2) % NBEAMS]));                                
+        end
+    endgenerate
+
 endmodule
