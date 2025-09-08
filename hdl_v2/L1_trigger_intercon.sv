@@ -21,6 +21,8 @@ module L1_trigger_intercon(
         `HOST_NAMED_PORTS_WB_IF( bq_ , 13, 32 )             // same as before
     );
 
+    parameter DEBUG = "FALSE";
+
     localparam [1:0] MODULE_THRESH = 2'b00;
     localparam [1:0] MODULE_CONTROL = 2'b01;
     localparam [1:0] MODULE_AGC = 2'b10;
@@ -77,27 +79,27 @@ module L1_trigger_intercon(
         else if (we) thresh_dat <= wb_dat_i;
         else if (thresh_ack_i) thresh_dat <= thresh_dat_i;
         
-        if (thresh_select && state == IDLE) thresh_adr <= wb_adr_i;
-        if (thresh_select && state == IDLE) thresh_we <= wb_we_i;
+        if (thresh_select && state == TRANSACTION) thresh_adr <= wb_adr_i;
+        if (thresh_select && state == TRANSACTION) thresh_we <= wb_we_i;
         
         if (!control_select) control_dat <= {32{1'b0}};
         else if (we) control_dat <= wb_dat_i;
         else if (control_ack_i) control_dat <= control_dat_i;
-        if (control_select && state == IDLE) control_adr <= wb_adr_i;
-        if (control_select && state == IDLE) control_we <= wb_we_i;
+        if (control_select && state == TRANSACTION) control_adr <= wb_adr_i;
+        if (control_select && state == TRANSACTION) control_we <= wb_we_i;
                 
         if (!agc_select) agc_dat <= {32{1'b0}};
         else if (we) agc_dat <= wb_dat_i;
         else if (agc_ack_i) agc_dat <= agc_dat_i;
-        if (agc_select && state == IDLE) agc_adr <= wb_adr_i;
-        if (agc_select && state == IDLE) agc_we <= wb_we_i;
+        if (agc_select && state == TRANSACTION) agc_adr <= wb_adr_i;
+        if (agc_select && state == TRANSACTION) agc_we <= wb_we_i;
         
         
         if (!bq_select) bq_dat <= {32{1'b0}};
         else if (we) bq_dat <= wb_dat_i;
         else if (bq_ack_i) bq_dat <= bq_dat_i;
-        if (bq_select && state == IDLE) bq_adr <= wb_adr_i;
-        if (bq_select && state == IDLE) bq_we <= wb_we_i;
+        if (bq_select && state == TRANSACTION) bq_adr <= wb_adr_i;
+        if (bq_select && state == TRANSACTION) bq_we <= wb_we_i;
 
         // wanna see something cool
         mux_up_dat <= thresh_dat | control_dat | agc_dat | bq_dat;
@@ -127,6 +129,36 @@ module L1_trigger_intercon(
         if (bq_ack_i) bq_cyc <= 0;        
         else if (state == TRANSACTION && bq_select) bq_cyc <= 1;
     end
+
+    generate
+        if (DEBUG == "TRUE") begin : ILA
+            reg [31:0] dat_dbg = {32{1'b0}};
+            reg [14:0] adr_dbg = {15{1'b0}};
+            reg we_dbg = 0;
+            reg cyc_dbg = 0;
+            reg [1:0] mod_dbg = {2{1'b0}};
+            reg ack_dbg = 0;
+            reg [1:0] state_dbg = {2{1'b0}};
+            always @(posedge wb_clk_i) begin
+                if (wb_we_i) dat_dbg <= wb_dat_i;
+                else dat_dbg <= wb_dat_o;
+                adr_dbg <= wb_adr_i;
+                cyc_dbg <= wb_cyc_i;
+                we_dbg <= wb_we_i;
+                mod_dbg <= module_select;
+                ack_dbg <= wb_ack_o;
+                state_dbg <= state;
+            end
+            l1_intercon_ila u_ila(.clk(wb_clk_i),
+                                  .probe0(dat_dbg),
+                                  .probe1(adr_dbg),
+                                  .probe2(we_dbg),
+                                  .probe3(cyc_dbg),
+                                  .probe4(mod_dbg),
+                                  .probe5(ack_dbg),
+                                  .probe6(state_dbg));
+        end
+    endgenerate
 
     assign wb_ack_o = (state == FINISH);
     assign wb_dat_o = mux_up_dat;
