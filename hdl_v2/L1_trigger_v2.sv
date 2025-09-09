@@ -3,6 +3,7 @@
 
 `define DLYFF #0.1
 module L1_trigger_v2 #(parameter NBEAMS=2, 
+                       parameter USE_V3 = "TRUE",
                        parameter WBCLKTYPE = "NONE", 
                        parameter CLKTYPE = "NONE",
                        parameter IFCLKTYPE = "NONE",
@@ -23,8 +24,7 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
         output trigger_count_done_o
     );
 
-    localparam OPTIMIZED = "TRUE";
-    
+    localparam OPTIMIZED = "TRUE";    
     localparam ZERO_IS_FAKE = (NBEAMS == 2) ? "TRUE" : "FALSE";
 
     // OK - the L1 space consists of the thresholds
@@ -91,25 +91,37 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
     
     // this MUST be tclk
     generate
-        if (OPTIMIZED == "TRUE") begin : O
-            beamform_trigger_v2b #(.FULL(NBEAMS == 2 ? "FALSE" : "TRUE"),
-                                   .DEBUG(NBEAMS == 2 ? "TRUE" : "FALSE"))
+        if (USE_V3 == "TRUE") begin : O3
+            beamform_trigger_v3 #(.FULL(NBEAMS == 2 ? "FALSE" : "TRUE"),
+                                  .DEBUG(NBEAMS == 2 ? "FALSE" : "TRUE"))
                 u_beam_trigger( .clk_i(tclk),
                                 .data_i(dat_i),
                                 .thresh_i(thresh_dat),
                                 .thresh_wr_i(thresh_wr),
                                 .thresh_update_i(thresh_update),
                                 .trigger_o(triggers));
-        end else begin : N
-            beamform_trigger_v2 #(.NBEAMS(NBEAMS),
-                                  .ZERO_IS_FAKE(ZERO_IS_FAKE))
-                u_beam_trigger( .clk_i(tclk),
-                                .data_i(dat_i),
-                                .thresh_i(thresh_dat),
-                                .thresh_wr_i(thresh_wr),
-                                .thresh_update_i(thresh_update),
-                                .trigger_o(triggers));
-        end            
+        end
+        else begin : V2
+            if (OPTIMIZED == "TRUE") begin : O
+                beamform_trigger_v2b #(.FULL(NBEAMS == 2 ? "FALSE" : "TRUE"),
+                                       .DEBUG(NBEAMS == 2 ? "TRUE" : "FALSE"))
+                    u_beam_trigger( .clk_i(tclk),
+                                    .data_i(dat_i),
+                                    .thresh_i(thresh_dat),
+                                    .thresh_wr_i(thresh_wr),
+                                    .thresh_update_i(thresh_update),
+                                    .trigger_o(triggers));
+            end else begin : N
+                beamform_trigger_v2 #(.NBEAMS(NBEAMS),
+                                      .ZERO_IS_FAKE(ZERO_IS_FAKE))
+                    u_beam_trigger( .clk_i(tclk),
+                                    .data_i(dat_i),
+                                    .thresh_i(thresh_dat),
+                                    .thresh_wr_i(thresh_wr),
+                                    .thresh_update_i(thresh_update),
+                                    .trigger_o(triggers));
+            end
+        end                        
     endgenerate
     // Now we want to cross the triggers from aclk -> ifclk.
     // This is an old module we reuse, hence NBEAMS*2 to cover

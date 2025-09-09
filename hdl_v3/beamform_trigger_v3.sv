@@ -104,6 +104,7 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
         for (l=0;l<NUM_LEFT_ADDERS;l=l+1) begin : LA
             if (NUM_LEFT_STORE > 1) begin : LS
                 sample_store #(.NBITS(SB_BITS),
+                               .PIPE("FALSE"),
                                .NSAMP(8),
                                .SAMPLE_STORE_DEPTH(NUM_LEFT_STORE))
                                u_store(.clk_i(clk_i),
@@ -131,6 +132,7 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
         for (r=0;r<NUM_RIGHT_ADDERS;r=r+1) begin : RA
             if (NUM_RIGHT_STORE > 1) begin : RS
                 sample_store #(.NBITS(SB_BITS),
+                               .PIPE("FALSE"),
                                .NSAMP(8),
                                .SAMPLE_STORE_DEPTH(NUM_LEFT_STORE))
                                u_store(.clk_i(clk_i),                               

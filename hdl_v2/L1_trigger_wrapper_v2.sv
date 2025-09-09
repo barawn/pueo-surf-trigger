@@ -10,6 +10,7 @@
 // - agc space       (0x4000 - 0x5FFF)
 // - biquad space    (0x6000 - 0x7FFF)
 module L1_trigger_wrapper_v2 #(parameter NBEAMS=2, 
+                    parameter USE_V3 = "TRUE",
                     parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
                     parameter AGC_CONTROL = "TRUE",
                     parameter USE_BIQUADS = "FALSE",
@@ -66,6 +67,7 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
 
     // this is the threshold space
     L1_trigger_v2 #(.NBEAMS(NBEAMS),
+                    .USE_V3(USE_V3),
                     .WBCLKTYPE(WBCLKTYPE),
                     .CLKTYPE(CLKTYPE),
                     .IFCLKTYPE(IFCLKTYPE))
