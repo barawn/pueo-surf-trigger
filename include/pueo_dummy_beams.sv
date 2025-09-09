@@ -53,8 +53,8 @@ package pueo_dummy_beams;
 					   '{ 0, 0 },
 					   '{ 0, 2 } };
 
-   localparam int BEAM_INDICES_DUMMY [0:1] = '{ '{0, 0, 0 },
-						'{1, 1, 1 } };
+   localparam int BEAM_INDICES_DUMMY [0:1][0:2] = '{ '{0, 0, 0 },
+						     '{1, 1, 1 } };
    
    localparam int BEAM_LEFT_OFFSETS_DUMMY [0:1] = '{ 0,
 					       0 };
