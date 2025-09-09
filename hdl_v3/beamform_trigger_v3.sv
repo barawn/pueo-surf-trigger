@@ -83,8 +83,8 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
     wire [NSAMP*SB_BITS-1:0] top_doublets[NUM_TOP_ADDERS-1:0];
     
     // adder storage
-    wire [NUM_LEFT_STORE*NBITS-1:0] left_store[NUM_LEFT_ADDERS-1:0];
-    wire [NUM_RIGHT_STORE*NBITS-1:0] right_store[NUM_LEFT_ADDERS-1:0];
+    wire [NUM_LEFT_STORE*NSAMP*SB_BITS-1:0] left_store[NUM_LEFT_ADDERS-1:0];
+    wire [NUM_RIGHT_STORE*NSAMP*SB_BITS-1:0] right_store[NUM_LEFT_ADDERS-1:0];
     // there is no top store
 
     // stupidity but whatever
