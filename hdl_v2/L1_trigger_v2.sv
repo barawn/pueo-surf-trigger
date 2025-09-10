@@ -93,7 +93,7 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
     generate
         if (USE_V3 == "TRUE") begin : O3
             beamform_trigger_v3 #(.FULL(NBEAMS == 2 ? "FALSE" : "TRUE"),
-                                  .DEBUG(NBEAMS == 2 ? "FALSE" : "TRUE"))
+                                  .DEBUG(NBEAMS == 2 ? "TRUE" : "FALSE"))
                 u_beam_trigger( .clk_i(tclk),
                                 .data_i(dat_i),
                                 .thresh_i(thresh_dat),
