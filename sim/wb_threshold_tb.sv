@@ -81,10 +81,10 @@ module wb_threshold_tb;
         wb_write(16'h0808, 32'd3000);
         wb_write(16'h080C, 32'd2000);
 
-        wb_write(16'h0C00, 32'd200);
-        wb_write(16'h0C04, 32'd100);
-        wb_write(16'h0C08, 32'd50);
-        wb_write(16'h0C0C, 32'd25);
+        wb_write(16'h0A00, 32'd5001);
+        wb_write(16'h0A04, 32'd100);
+        wb_write(16'h0A08, 32'd50);
+        wb_write(16'h0A0C, 32'd25);
         
         wb_read(16'h0800);
         wb_read(16'h0804);
