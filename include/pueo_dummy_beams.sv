@@ -1,3 +1,6 @@
+`ifndef PUEO_DUMMY_BEAMS_SV
+`define PUEO_DUMMY_BEAMS_SV
+
 package pueo_dummy_beams;
    localparam int NUM_DUMMY = 2;
 
@@ -64,3 +67,5 @@ package pueo_dummy_beams;
 					      0 };
 
 endpackage // pueo_dummy_beams
+
+`endif

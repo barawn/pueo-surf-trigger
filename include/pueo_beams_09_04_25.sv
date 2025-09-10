@@ -1,3 +1,7 @@
+`ifndef PUEO_BEAMS_SV
+`define PUEO_BEAMS_SV
+
+// Vivado won't show 
 package pueo_beams;
 	localparam int NUM_BEAM = 48;
 
@@ -448,3 +452,5 @@ package pueo_beams;
 
 
 endpackage
+
+`endif
