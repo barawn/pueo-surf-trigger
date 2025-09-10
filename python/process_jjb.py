@@ -219,6 +219,9 @@ if __name__ == '__main__':
     params['BEAM_TOP_OFFSETS'] = topOffsets
 
     with open(args.outfile, 'w') as f:
+        print('`ifndef PUEO_BEAMS_SV')
+        print('`define PUEO_BEAMS_SV')
+        print('')
         print('package pueo_beams;', file=f)
         
         for k, v in params.items():
@@ -226,4 +229,6 @@ if __name__ == '__main__':
             print('', file=f)
 
         print('endpackage', file=f)
+        print('')
+        print('`endif')
         
