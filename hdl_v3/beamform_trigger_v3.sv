@@ -175,7 +175,7 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
                           .dat_o(top_doublets[t]));
         end
         // and now we build the beams
-        for (b=0;b<NBEAMS;b=b+1) begin : BB
+        for (b=0;b<NBEAMS;b=b+2) begin : BB
             wire [NSAMP*3*SB_BITS-1:0] beam0;
             wire [NSAMP*3*SB_BITS-1:0] beam1;
             wire [3:0] trigger_out;
