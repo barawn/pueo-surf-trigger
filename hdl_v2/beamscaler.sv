@@ -42,10 +42,9 @@ module beamscaler #(parameter CASCADE = "FALSE",    //! use the cascade input
     reg [3:0] sat_seen_B = {4{1'b0}};
         
     reg [3:0][2:0] count_ifclk = {4*3{1'b0}};
+          
     (* CUSTOM_CC_SRC = IFCLKTYPE *)
     reg [3:0][2:0] count_ifclk_hold = {4*3{1'b0}};
-    (* CUSTOM_CC_DST = WBCLKTYPE *)
-    reg [3:0][2:0] count_wbclk = {4*3{1'b0}};
     
     // DSP now operates in 4 modes
     // 1. P = A:B + P - normal operation  
@@ -60,7 +59,14 @@ module beamscaler #(parameter CASCADE = "FALSE",    //! use the cascade input
     // 010  ZMUX = 0,state[1],state[0]    YMUX=state[2],0   XMUX=state[1],!state[0]
     // 111
     // 001
-    wire [2:0] dsp_ZMUX = { 1'b0, state_i[1], state_i[0] };
+    
+    // when CASCADE is false, SHIFT doesn't need anything since it just clears the bottom.
+    // So we can just do 1/2 b/c
+    // 010 ZMUX = 010 = P
+    // 111 ZMUX = 011 = C
+    // 001 ZMUX = 000 = nothin'
+    wire [2:0] dsp_ZMUX = (CASCADE == "TRUE") ? { 1'b0, state_i[1], state_i[0] } :
+                                                { 1'b0, state_i[1], state_i[2] };
     wire [1:0] dsp_YMUX = { state_i[2], 1'b0 };
     wire [1:0] dsp_XMUX = { state_i[1], state_i[0] };   // this is WRONG but we invert in DSP
     wire [8:0] dsp_OPMODE = { 2'b00, dsp_ZMUX, dsp_YMUX, dsp_XMUX };
@@ -68,10 +74,10 @@ module beamscaler #(parameter CASCADE = "FALSE",    //! use the cascade input
     wire [3:0] dsp_ALUMODE = { {2{state_i[2]}}, 2'b00 }; 
 
 
-    wire [47:0] dsp_AB = { { {9{1'b0}}, count_wbclk[3] },
-                           { {9{1'b0}}, count_wbclk[2] },
-                           { {9{1'b0}}, count_wbclk[1] },
-                           { {9{1'b0}}, count_wbclk[0] } };
+    wire [47:0] dsp_AB = { { {9{1'b0}}, count_ifclk_hold[3] },
+                           { {9{1'b0}}, count_ifclk_hold[2] },
+                           { {9{1'b0}}, count_ifclk_hold[1] },
+                           { {9{1'b0}}, count_ifclk_hold[0] } };
     wire [47:0] A_dsp_C = { {12{sat_seen_A[3]}},
                             {12{sat_seen_A[2]}},
                             {12{sat_seen_A[1]}},
@@ -82,25 +88,28 @@ module beamscaler #(parameter CASCADE = "FALSE",    //! use the cascade input
                             {12{sat_seen_B[0]}} };
     wire [3:0] A_dsp_CARRY;
     wire [3:0] B_dsp_CARRY;
+    
     always @(posedge ifclk_i) begin
         if (ifclk_ce_i) count_ifclk_hold <= count_ifclk;
 
-        if (ifclk_ce_i) count_ifclk <= {4*3{1'b0}};
-        else begin
-            if (count_i[0]) count_ifclk[0] <= count_ifclk[0] + 1;
-            if (count_i[1]) count_ifclk[1] <= count_ifclk[1] + 1;
-            if (count_i[2]) count_ifclk[2] <= count_ifclk[2] + 1;
-            if (count_i[3]) count_ifclk[3] <= count_ifclk[3] + 1;
+        if (ifclk_ce_i) begin
+            count_ifclk[0] <= count_i[0];
+            count_ifclk[1] <= count_i[1];
+            count_ifclk[2] <= count_i[2];
+            count_ifclk[3] <= count_i[3];
+        end else begin
+            count_ifclk[0] <= count_ifclk[0] + count_i[0];
+            count_ifclk[1] <= count_ifclk[1] + count_i[1];
+            count_ifclk[2] <= count_ifclk[2] + count_i[2];
+            count_ifclk[3] <= count_ifclk[3] + count_i[3];
         end
     end
-    always @(posedge wb_clk_i) begin
-        if (wb_clk_ce_i) count_wbclk <= count_ifclk_hold;
-    
-        if (state_ce_i[0] && state_i == 2'b10) sat_seen_A <= {4{1'b0}};
+    always @(posedge wb_clk_i) begin    
+        if ((state_ce_i[0] && state_i[2]) | rstp_i) sat_seen_A <= {4{1'b0}};
         else begin
             sat_seen_A <= A_dsp_CARRY | sat_seen_A;
         end
-        if (state_ce_i[1] && state_i == 2'b10) sat_seen_B <= {4{1'b0}};
+        if ((state_ce_i[1] && state_i[2]) | rstp_i) sat_seen_B <= {4{1'b0}};
         else begin
             sat_seen_B <= B_dsp_CARRY | sat_seen_B;
         end        
@@ -108,6 +117,7 @@ module beamscaler #(parameter CASCADE = "FALSE",    //! use the cascade input
 
     generate
         if (CASCADE == "FALSE") begin : NCSC
+            (* CUSTOM_CC_DST = WBCLKTYPE *)
             DSP48E2 #(`NO_MULT_ATTRS,
                       `DE2_UNUSED_ATTRS,
                       .USE_SIMD("FOUR12"),
@@ -123,10 +133,12 @@ module beamscaler #(parameter CASCADE = "FALSE",    //! use the cascade input
                       .CARRYINREG(0),
                       .CARRYINSELREG(0))
                       u_dspA(
+                        .CLK( wb_clk_i ),
                         .A( `DSP_AB_A(dsp_AB) ),
                         .B( `DSP_AB_B(dsp_AB) ),
-                        .RSTA( wb_clk_ce ),
-                        .RSTB( wb_clk_ce ),
+                        .RSTA( wb_clk_ce_i ),
+                        .RSTB( wb_clk_ce_i ),
+                        .RSTC(1'b0),   
                         .C( A_dsp_C ),          
                         .CEA2(1'b1),.CEB2(1'b1),.CEC(1'b1),
                         .OPMODE( dsp_OPMODE ),
@@ -134,9 +146,13 @@ module beamscaler #(parameter CASCADE = "FALSE",    //! use the cascade input
                         .CECTRL( state_ce_i[0] ),
                         .CEALUMODE( state_ce_i[0] ),
                         .CEP( dsp_ce_i[0] ),
+                        .CARRYOUT( A_dsp_CARRY ),
+                        .RSTCTRL( rstp_i ),
+                        .RSTP( rstp_i ),
                         .P( count_o[0 +: 48] ),
                         .PCOUT( pc_o[0 +: 48] )
                       );
+            (* CUSTOM_CC_DST = WBCLKTYPE *)
             DSP48E2 #(`NO_MULT_ATTRS,
                       `DE2_UNUSED_ATTRS,
                       .USE_SIMD("FOUR12"),
@@ -152,21 +168,27 @@ module beamscaler #(parameter CASCADE = "FALSE",    //! use the cascade input
                       .CARRYINREG(0),
                       .CARRYINSELREG(0))
                       u_dspB(
+                        .CLK( wb_clk_i ),
                         .A( `DSP_AB_A(dsp_AB) ),
                         .B( `DSP_AB_B(dsp_AB) ),
-                        .RSTA( wb_clk_ce ),
-                        .RSTB( wb_clk_ce ),
-                        .C( B_dsp_C ),          
+                        .RSTA( wb_clk_ce_i ),
+                        .RSTB( wb_clk_ce_i ),
+                        .C( B_dsp_C ),       
+                        .RSTC(1'b0),   
                         .CEA2(1'b1),.CEB2(1'b1),.CEC(1'b1),
                         .OPMODE( dsp_OPMODE ),
                         .ALUMODE( dsp_ALUMODE ),
                         .CECTRL( state_ce_i[1] ),
                         .CEALUMODE( state_ce_i[1] ),
                         .CEP( dsp_ce_i[1] ),
+                        .CARRYOUT( B_dsp_CARRY ),
+                        .RSTCTRL( rstp_i ),
+                        .RSTP( rstp_i ),
                         .P( count_o[48 +: 48] ),
                         .PCOUT( pc_o[48 +: 48] ) 
                       );
         end else begin : CSC
+            (* CUSTOM_CC_DST = WBCLKTYPE *)
             DSP48E2 #(`NO_MULT_ATTRS,
                       `DE2_UNUSED_ATTRS,
                       .USE_SIMD("FOUR12"),
@@ -182,10 +204,12 @@ module beamscaler #(parameter CASCADE = "FALSE",    //! use the cascade input
                       .CARRYINREG(0),
                       .CARRYINSELREG(0))
                       u_dspA(
+                        .CLK( wb_clk_i ),
                         .A( `DSP_AB_A(dsp_AB) ),
                         .B( `DSP_AB_B(dsp_AB) ),
-                        .RSTA( wb_clk_ce ),
-                        .RSTB( wb_clk_ce ),
+                        .RSTA( wb_clk_ce_i ),
+                        .RSTB( wb_clk_ce_i ),
+                        .RSTC(1'b0),   
                         .C( A_dsp_C ),          
                         .CEA2(1'b1),.CEB2(1'b1),.CEC(1'b1),
                         .OPMODE( dsp_OPMODE ),
@@ -193,10 +217,14 @@ module beamscaler #(parameter CASCADE = "FALSE",    //! use the cascade input
                         .CECTRL( state_ce_i[0] ),
                         .CEALUMODE( state_ce_i[0] ),
                         .CEP( dsp_ce_i[0] ),
+                        .CARRYOUT( A_dsp_CARRY ),
+                        .RSTCTRL( rstp_i ),
+                        .RSTP( rstp_i ),
                         .P( count_o[0 +: 48] ),
                         .PCIN( pc_i[0 +: 48] ),
                         .PCOUT( pc_o[0 +: 48] )
                       );
+            (* CUSTOM_CC_DST = WBCLKTYPE *)
             DSP48E2 #(`NO_MULT_ATTRS,
                       `DE2_UNUSED_ATTRS,
                       .USE_SIMD("FOUR12"),
@@ -212,10 +240,12 @@ module beamscaler #(parameter CASCADE = "FALSE",    //! use the cascade input
                       .CARRYINREG(0),
                       .CARRYINSELREG(0))
                       u_dspB(
+                        .CLK( wb_clk_i ),
                         .A( `DSP_AB_A(dsp_AB) ),
                         .B( `DSP_AB_B(dsp_AB) ),
-                        .RSTA( wb_clk_ce ),
-                        .RSTB( wb_clk_ce ),
+                        .RSTA( wb_clk_ce_i ),
+                        .RSTB( wb_clk_ce_i ),
+                        .RSTC(1'b0),   
                         .C( B_dsp_C ),          
                         .CEA2(1'b1),.CEB2(1'b1),.CEC(1'b1),
                         .OPMODE( dsp_OPMODE ),
@@ -223,6 +253,9 @@ module beamscaler #(parameter CASCADE = "FALSE",    //! use the cascade input
                         .CECTRL( state_ce_i[1] ),
                         .CEALUMODE( state_ce_i[1] ),
                         .CEP( dsp_ce_i[1] ),
+                        .CARRYOUT( B_dsp_CARRY ),
+                        .RSTCTRL( rstp_i ),
+                        .RSTP( rstp_i ),
                         .P( count_o[48 +: 48] ),
                         .PCIN( pc_i[48 +: 48] ),
                         .PCOUT( pc_o[48 +: 48] ) 

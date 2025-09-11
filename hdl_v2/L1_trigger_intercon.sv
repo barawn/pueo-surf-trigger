@@ -3,18 +3,28 @@
 // the L1 trigger interconnect isn't combinatoric, it's registered
 // because we want to cut down the cost and power to get to the stuff running in ACLK.
 // we'll see.
+//
+// 46 -> 92 -> 7 address bits -> 9 real 
 module L1_trigger_intercon(
         input wb_clk_i,
         input clock_enabled_i,
         `TARGET_NAMED_PORTS_WB_IF( wb_ , 15, 32 ),
-        `HOST_NAMED_PORTS_WB_IF( thresh_ , 13, 32 ),
-        `HOST_NAMED_PORTS_WB_IF( generator_ , 13, 32 ),
-        `HOST_NAMED_PORTS_WB_IF( agc_ , 13, 32 ),
-        `HOST_NAMED_PORTS_WB_IF( bq_ , 13, 32 ) 
+        `HOST_NAMED_PORTS_WB_IF( thresh_ , 13, 32 ),        // 0x0000 - 0x1FFF
+                                                            // 0x0000 - 0x03FF (reserved)
+                                                            // 0x0400 - 0x07FF (scalers)
+                                                            // 0x0800 - 0x0BFF (trigger thresholds)
+                                                            // 0x0C00 - 0x0FFF (trigger subthresholds)
+                                                            // 0x1000 - 0x17FF (reserved)
+                                                            // 0x1800 - 0x1FFF (threshold/scal control)
+        `HOST_NAMED_PORTS_WB_IF( control_ , 13, 32 ),       // beam masking only for now I think
+        `HOST_NAMED_PORTS_WB_IF( agc_ , 13, 32 ),           // same as before
+        `HOST_NAMED_PORTS_WB_IF( bq_ , 13, 32 )             // same as before
     );
 
+    parameter DEBUG = "FALSE";
+
     localparam [1:0] MODULE_THRESH = 2'b00;
-    localparam [1:0] MODULE_GENERATOR = 2'b01;
+    localparam [1:0] MODULE_CONTROL = 2'b01;
     localparam [1:0] MODULE_AGC = 2'b10;
     localparam [1:0] MODULE_BQ = 2'b11;
     
@@ -26,11 +36,11 @@ module L1_trigger_intercon(
     reg [12:0]  thresh_adr = {13{1'b0}};
     reg [31:0]  thresh_dat = {32{1'b0}};
     
-    wire        generator_select = (module_select == MODULE_GENERATOR) && clock_enabled_i;
-    reg         generator_cyc = 0;
-    reg         generator_we = 0;
-    reg [12:0]  generator_adr = {13{1'b0}};
-    reg [31:0]  generator_dat = {32{1'b0}};
+    wire        control_select = (module_select == MODULE_CONTROL) && clock_enabled_i;
+    reg         control_cyc = 0;
+    reg         control_we = 0;
+    reg [12:0]  control_adr = {13{1'b0}};
+    reg [31:0]  control_dat = {32{1'b0}};
     
     
     wire        agc_select = (module_select == MODULE_AGC) && clock_enabled_i;
@@ -69,31 +79,31 @@ module L1_trigger_intercon(
         else if (we) thresh_dat <= wb_dat_i;
         else if (thresh_ack_i) thresh_dat <= thresh_dat_i;
         
-        if (thresh_select && state == IDLE) thresh_adr <= wb_adr_i;
-        if (thresh_select && state == IDLE) thresh_we <= wb_we_i;
+        if (thresh_select && state == TRANSACTION) thresh_adr <= wb_adr_i;
+        if (thresh_select && state == TRANSACTION) thresh_we <= wb_we_i;
         
-        if (!generator_select) generator_dat <= {32{1'b0}};
-        else if (we) generator_dat <= wb_dat_i;
-        else if (generator_ack_i) generator_dat <= generator_dat_i;
-        if (generator_select && state == IDLE) generator_adr <= wb_adr_i;
-        if (generator_select && state == IDLE) generator_we <= wb_we_i;
+        if (!control_select) control_dat <= {32{1'b0}};
+        else if (we) control_dat <= wb_dat_i;
+        else if (control_ack_i) control_dat <= control_dat_i;
+        if (control_select && state == TRANSACTION) control_adr <= wb_adr_i;
+        if (control_select && state == TRANSACTION) control_we <= wb_we_i;
                 
         if (!agc_select) agc_dat <= {32{1'b0}};
         else if (we) agc_dat <= wb_dat_i;
         else if (agc_ack_i) agc_dat <= agc_dat_i;
-        if (agc_select && state == IDLE) agc_adr <= wb_adr_i;
-        if (agc_select && state == IDLE) agc_we <= wb_we_i;
+        if (agc_select && state == TRANSACTION) agc_adr <= wb_adr_i;
+        if (agc_select && state == TRANSACTION) agc_we <= wb_we_i;
         
         
         if (!bq_select) bq_dat <= {32{1'b0}};
         else if (we) bq_dat <= wb_dat_i;
         else if (bq_ack_i) bq_dat <= bq_dat_i;
-        if (bq_select && state == IDLE) bq_adr <= wb_adr_i;
-        if (bq_select && state == IDLE) bq_we <= wb_we_i;
+        if (bq_select && state == TRANSACTION) bq_adr <= wb_adr_i;
+        if (bq_select && state == TRANSACTION) bq_we <= wb_we_i;
 
         // wanna see something cool
-        mux_up_dat <= thresh_dat | generator_dat | agc_dat | bq_dat;
-        mux_up_ack <= thresh_ack_i | generator_ack_i | agc_ack_i | bq_ack_i | no_ack;
+        mux_up_dat <= thresh_dat | control_dat | agc_dat | bq_dat;
+        mux_up_ack <= thresh_ack_i | control_ack_i | agc_ack_i | bq_ack_i | no_ack;
 
         if (wb_cyc_i && state == IDLE)
             module_select <= wb_adr_i[14:13];
@@ -110,8 +120,8 @@ module L1_trigger_intercon(
         if (thresh_ack_i) thresh_cyc <= 0;
         else if (state == TRANSACTION && thresh_select) thresh_cyc <= 1;
         
-        if (generator_ack_i) generator_cyc <= 0;
-        else if (state == TRANSACTION && generator_select) generator_cyc <= 1;
+        if (control_ack_i) control_cyc <= 0;
+        else if (state == TRANSACTION && control_select) control_cyc <= 1;
         
         if (agc_ack_i) agc_cyc <= 0;
         else if (state == TRANSACTION && agc_select) agc_cyc <= 1;
@@ -119,6 +129,36 @@ module L1_trigger_intercon(
         if (bq_ack_i) bq_cyc <= 0;        
         else if (state == TRANSACTION && bq_select) bq_cyc <= 1;
     end
+
+    generate
+        if (DEBUG == "TRUE") begin : ILA
+            reg [31:0] dat_dbg = {32{1'b0}};
+            reg [14:0] adr_dbg = {15{1'b0}};
+            reg we_dbg = 0;
+            reg cyc_dbg = 0;
+            reg [1:0] mod_dbg = {2{1'b0}};
+            reg ack_dbg = 0;
+            reg [1:0] state_dbg = {2{1'b0}};
+            always @(posedge wb_clk_i) begin
+                if (wb_we_i) dat_dbg <= wb_dat_i;
+                else dat_dbg <= wb_dat_o;
+                adr_dbg <= wb_adr_i;
+                cyc_dbg <= wb_cyc_i;
+                we_dbg <= wb_we_i;
+                mod_dbg <= module_select;
+                ack_dbg <= wb_ack_o;
+                state_dbg <= state;
+            end
+            l1_intercon_ila u_ila(.clk(wb_clk_i),
+                                  .probe0(dat_dbg),
+                                  .probe1(adr_dbg),
+                                  .probe2(we_dbg),
+                                  .probe3(cyc_dbg),
+                                  .probe4(mod_dbg),
+                                  .probe5(ack_dbg),
+                                  .probe6(state_dbg));
+        end
+    endgenerate
 
     assign wb_ack_o = (state == FINISH);
     assign wb_dat_o = mux_up_dat;
@@ -132,12 +172,12 @@ module L1_trigger_intercon(
     assign thresh_we_o =  thresh_we;
     assign thresh_sel_o = 4'hF;
         
-    assign generator_cyc_o = generator_cyc;
-    assign generator_stb_o = generator_cyc;
-    assign generator_adr_o = generator_adr;
-    assign generator_dat_o = generator_dat;
-    assign generator_we_o = generator_we;
-    assign generator_sel_o = 4'hF;
+    assign control_cyc_o = control_cyc;
+    assign control_stb_o = control_cyc;
+    assign control_adr_o = control_adr;
+    assign control_dat_o = control_dat;
+    assign control_we_o = control_we;
+    assign control_sel_o = 4'hF;
     
     assign agc_cyc_o = agc_cyc;
     assign agc_stb_o = agc_cyc;
