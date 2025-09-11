@@ -47,7 +47,7 @@ Wishbone Address Space For L1 Trigger
             0x4044 : AGC offset adjustment delta per cycle.
    0x6000 - 0x7FFF : Biquads
       Channel index mask is 0x1C00 (bits [12:10])
-         Biquad (0/1) selection mask is 0x800 (bit [7])
+         Biquad (0/1) selection mask is 0x80 (bit [7])
             0x6000 : control (individual biquad update, bypass control).
             0x6004 : coefficients for the single zero FIR (A, B ) programmed in 
                      a cascade (write B to 0x04, then write A to 0x04).

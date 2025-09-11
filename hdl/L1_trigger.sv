@@ -11,6 +11,7 @@ module L1_trigger #(parameter NBEAMS=2,
                     parameter ZERO_IS_FAKE="FALSE",
                     parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
                     parameter USE_BIQUADS = "FALSE",
+                    parameter HDL_FILTER_VERSION = "DEFAULT",
                     parameter WBCLKTYPE = "PSCLK", parameter CLKTYPE = "ACLK",
                     parameter AGC_CONTROL = "FALSE",
                     parameter [47:0] TRIGGER_CLOCKS=375000000,
@@ -266,8 +267,10 @@ module L1_trigger #(parameter NBEAMS=2,
     assign dat_debug = data_stage_debug;
     `endif
 
+
     trigger_chain_x8_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
                                .AGC_CONTROL(AGC_CONTROL),
+                               .HDL_FILTER_VERSION(HDL_FILTER_VERSION),
                                .USE_BIQUADS(USE_BIQUADS),
                                .WBCLKTYPE(WBCLKTYPE),.CLKTYPE(CLKTYPE))
                 u_chain(
