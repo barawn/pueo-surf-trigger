@@ -106,8 +106,12 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
     // finally this is the generator space, which in V2 is embedded
     // in the trigger module.   
     // this also contains the AGC reset for no particularly good reason
+    // We also now pass USE_V3 as an option, which gets passed down to
+    // the trigger generator and determines whether or not the beam metadata
+    // is built.
     generator_wrap #(.WBCLKTYPE(WBCLKTYPE),
                      .IFCLKTYPE(IFCLKTYPE),
+                     .USE_V3(USE_V3),
                      .NBEAMS(NBEAMS))
         u_generator( .wb_clk_i(wb_clk_i),
                      `CONNECT_WBS_IFM( wb_ , generator_ ),

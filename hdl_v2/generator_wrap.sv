@@ -2,6 +2,7 @@
 `include "interfaces.vh"
 module generator_wrap #(parameter WBCLKTYPE = "NONE",
                         parameter IFCLKTYPE = "NONE",
+                        parameter USE_V3 = "FALSE",
                         parameter NBEAMS = 46)(
         input wb_clk_i,
         `TARGET_NAMED_PORTS_WB_IF( wb_ , 13, 32 ),
@@ -32,7 +33,10 @@ module generator_wrap #(parameter WBCLKTYPE = "NONE",
              .beam_mask_wr_o(beam_wr),
              .beam_mask_update_o(beam_update));                       
 
-    surf_trig_gen_v2 #(.NBEAMS(NBEAMS),
+    // The v3 trig gen SHOULD be 'morphable' back into
+    // the v2 with its parameter.
+    surf_trig_gen_v3 #(.NBEAMS(NBEAMS),
+                       .USE_V3(USE_V3),
                        .IFCLKTYPE(IFCLKTYPE),
                        .TRIG_CLOCKDOMAIN("IFCLK"))
         u_triggen(.ifclk(ifclk),
