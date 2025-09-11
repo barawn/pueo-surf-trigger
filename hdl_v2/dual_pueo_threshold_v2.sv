@@ -23,8 +23,8 @@ module dual_pueo_threshold_v2 #(parameter CASCADE = "TRUE")(
     wire dspB_CEB2 = dspB_update[0];
     wire dspB_CEA2 = dspB_update[1];
     
-    wire [47:0] dspA_AB = { {6{1'b0}}, thresh_i[18 +: 18],
-                            {6{1'b0}}, thresh_i[0 +: 18] };
+    wire [47:0] dspA_AB = { {6{thresh_i[35]}}, thresh_i[18 +: 18],
+                            {6{thresh_i[17]}}, thresh_i[0 +: 18] };
     wire [47:0] dspA_C = { {6{1'b0}}, envelope_i[18 +: 18],
                            {6{1'b0}}, envelope_i[0 +: 18] };                            
 
@@ -34,18 +34,22 @@ module dual_pueo_threshold_v2 #(parameter CASCADE = "TRUE")(
     // scaler.
     wire [47:0] ab_cascade;
     wire [47:0] p_cascade;
-    
-    wire [3:0] dspA_carryout;
+
+    // OK - the carry outs do not work, because in some cases
+    // you're rolling around (for instance, if you're adding a negative).
+    // Instead, we just need to pull off the top bit of the result
+    // to use as a sign indicator.
+    wire [47:0] dspA_P;
+    wire [1:0] dspA_trigger = { dspA_P[47], dspA_P[23] };
     reg [1:0] main_trigger = {2{1'b0}};
-    wire [3:0] dspB_carryout;
+    wire [47:0] dspB_P;
+    wire [1:0] dspB_trigger = { dspB_P[47], dspB_P[23] };    
     reg [1:0] subthresh_trigger = {2{1'b0}};
-    
-    wire [47:0] dspB_pout;
-    
+        
     always @(posedge clk_i) begin
         dspB_update <= thresh_update_i;
-        main_trigger <= {!dspA_carryout[`DUAL_DSP_CARRY1], !dspA_carryout[`DUAL_DSP_CARRY0]};
-        subthresh_trigger <= {!dspB_carryout[`DUAL_DSP_CARRY1], !dspB_carryout[`DUAL_DSP_CARRY0]} | main_trigger;
+        main_trigger <= dspA_trigger;
+        subthresh_trigger <= dspB_trigger;        
     end
     
     generate
@@ -72,7 +76,7 @@ module dual_pueo_threshold_v2 #(parameter CASCADE = "TRUE")(
                         .ACOUT( ab_cascade[18 +: 30] ),
                         .BCOUT( ab_cascade[0 +: 18] ),
                         .PCOUT( p_cascade ),
-                        .CARRYOUT( dspA_carryout ),
+                        .P(dspA_P),
                         .RSTA(1'b0),.RSTB(1'b0),.RSTC(1'b0),.RSTP(1'b0),
                         .OPMODE( { 2'b10, `Z_OPMODE_C, `Y_OPMODE_0, `X_OPMODE_AB } ),
                         .ALUMODE( `ALUMODE_XYCIN_MINUS_Z_MINUS_1 ),
@@ -103,7 +107,7 @@ module dual_pueo_threshold_v2 #(parameter CASCADE = "TRUE")(
                         .ACOUT( ab_cascade[ 18 +: 30 ] ),
                         .BCOUT( ab_cascade[ 0 +: 18 ] ),
                         .PCOUT( p_cascade ),
-                        .CARRYOUT( dspA_carryout ),                        
+                        .P(dspA_P),
                         .RSTA(1'b0),.RSTB(1'b0),.RSTC(1'b0),.RSTP(1'b0),
                         .OPMODE( { 2'b10, `Z_OPMODE_C, `Y_OPMODE_0, `X_OPMODE_AB } ),
                         .ALUMODE( `ALUMODE_XYCIN_MINUS_Z_MINUS_1 ),
@@ -137,8 +141,7 @@ module dual_pueo_threshold_v2 #(parameter CASCADE = "TRUE")(
                 .ACOUT( ab_casc_o[ 18 +: 30 ] ),
                 .BCOUT( ab_casc_o[ 0 +: 18 ] ),
                 .PCIN( p_cascade ),
-                .P(dspB_pout),
-                .CARRYOUT( dspB_carryout ),
+                .P(dspB_P),
                 .RSTA(1'b0),.RSTB(1'b0),.RSTP(1'b0),
                 .OPMODE( { 2'b00, `Z_OPMODE_PCIN, `Y_OPMODE_0, `X_OPMODE_AB } ),
                 .ALUMODE( `ALUMODE_Z_MINUS_XYCIN ),

@@ -88,7 +88,7 @@ module dual_pueo_envelope_v2 #(localparam NBITS=14,
                         .I0( in[0][0] ),    \
                         .O5( out[0] ),      \
                         .O6( out[1] ));     \
-        assign name``_lowbit_carry = in[3][0] && in[2][0] && in[1][0] && in[0][0];  \
+        wire name``_lowbit_carry = in[3][0] && in[2][0] && in[1][0] && in[0][0];  \
         assign out[2] = in[3][2] ^ in[2][2] ^ in[1][2] ^ in[0][2] ^ name``_lowbit_carry
 
     // generate the low bits

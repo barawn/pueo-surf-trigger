@@ -3,8 +3,10 @@
 
 `define DLYFF #0.1
 module L1_trigger_v2 #(parameter NBEAMS=2, 
+                       parameter USE_V3 = "TRUE",
                        parameter WBCLKTYPE = "NONE", 
                        parameter CLKTYPE = "NONE",
+                       parameter IFCLKTYPE = "NONE",
                        localparam NCHAN=8,
                        localparam NSAMP=8,
                        localparam AGC_BITS=5)(
@@ -12,7 +14,7 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
         input wb_rst_i,
         `TARGET_NAMED_PORTS_WB_IF( wb_ , 13, 32 ),
 
-        input tclk,        
+        input tclk,
         input [NCHAN-1:0][AGC_BITS*NSAMP-1:0] dat_i,
         
         input aclk,
@@ -21,6 +23,9 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
         output [NBEAMS-1:0] trigger_o,
         output trigger_count_done_o
     );
+
+    localparam OPTIMIZED = "TRUE";    
+    localparam ZERO_IS_FAKE = (NBEAMS == 2) ? "TRUE" : "FALSE";
 
     // OK - the L1 space consists of the thresholds
     // and scalers. We split them up here, but mangle
@@ -71,7 +76,9 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
     wire [1:0][NBEAMS-1:0] trig_stretch;
                                            
     // this can be aclk.
-    wb_thresholds #(.NBEAMS(NBEAMS))
+    wb_thresholds #(.NBEAMS(NBEAMS),
+                    .WBCLKTYPE(WBCLKTYPE),
+                    .ACLKTYPE(CLKTYPE))
         u_thresh_wb( .wb_clk_i(wb_clk_i),
                      `CONNECT_WBS_IFM( wb_ , thresh_ ),
                      .scal_bank_i(scal_bank),
@@ -83,14 +90,39 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
                      .thresh_update_o(thresh_update));
     
     // this MUST be tclk
-    beamform_trigger_v2 #(.NBEAMS(NBEAMS))
-        u_beam_trigger( .clk_i(tclk),
-                        .data_i(dat_i),
-                        .thresh_i(thresh_dat),
-                        .thresh_wr_i(thresh_wr),
-                        .thresh_update_i(thresh_update),
-                        .trigger_o(triggers));
-    
+    generate
+        if (USE_V3 == "TRUE") begin : O3
+            beamform_trigger_v3 #(.FULL(NBEAMS == 2 ? "FALSE" : "TRUE"),
+                                  .DEBUG(NBEAMS == 2 ? "TRUE" : "FALSE"))
+                u_beam_trigger( .clk_i(tclk),
+                                .data_i(dat_i),
+                                .thresh_i(thresh_dat),
+                                .thresh_wr_i(thresh_wr),
+                                .thresh_update_i(thresh_update),
+                                .trigger_o(triggers));
+        end
+        else begin : V2
+            if (OPTIMIZED == "TRUE") begin : O
+                beamform_trigger_v2b #(.FULL(NBEAMS == 2 ? "FALSE" : "TRUE"),
+                                       .DEBUG(NBEAMS == 2 ? "TRUE" : "FALSE"))
+                    u_beam_trigger( .clk_i(tclk),
+                                    .data_i(dat_i),
+                                    .thresh_i(thresh_dat),
+                                    .thresh_wr_i(thresh_wr),
+                                    .thresh_update_i(thresh_update),
+                                    .trigger_o(triggers));
+            end else begin : N
+                beamform_trigger_v2 #(.NBEAMS(NBEAMS),
+                                      .ZERO_IS_FAKE(ZERO_IS_FAKE))
+                    u_beam_trigger( .clk_i(tclk),
+                                    .data_i(dat_i),
+                                    .thresh_i(thresh_dat),
+                                    .thresh_wr_i(thresh_wr),
+                                    .thresh_update_i(thresh_update),
+                                    .trigger_o(triggers));
+            end
+        end                        
+    endgenerate
     // Now we want to cross the triggers from aclk -> ifclk.
     // This is an old module we reuse, hence NBEAMS*2 to cover
     // the subthresholds.
@@ -105,7 +137,10 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
 
     assign trigger_o = trig_stretch[0];
 
-    beamscaler_wb_wrap #(.NBEAMS(NBEAMS))
+    beamscaler_wb_wrap #(.NBEAMS(NBEAMS),
+                         .DEBUG("TRUE"),
+                         .IFCLKTYPE(IFCLKTYPE),
+                         .WBCLKTYPE(WBCLKTYPE))
         u_scalers(.wb_clk_i(wb_clk_i),
                   `CONNECT_WBS_IFM(wb_ , scaler_ ),
                   

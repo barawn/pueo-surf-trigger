@@ -5,7 +5,7 @@ module generator_wrap #(parameter WBCLKTYPE = "NONE",
                         parameter NBEAMS = 46)(
         input wb_clk_i,
         `TARGET_NAMED_PORTS_WB_IF( wb_ , 13, 32 ),
-
+        output agc_reset_o, // this doesn't belong here but whatever
         input ifclk,
         input ifclk_running_i,
         input [NBEAMS-1:0] trig_i,
@@ -26,6 +26,7 @@ module generator_wrap #(parameter WBCLKTYPE = "NONE",
              `CONNECT_WBS_IFS(wb_, wb_),
              .ifclk(ifclk),
              .ifclk_running_i(ifclk_running_i),
+             .agc_reset_o(agc_reset_o), // silliness
              .gen_rst_o(gen_rst),
              .beam_mask_o(beam_mask),
              .beam_mask_wr_o(beam_wr),

@@ -23,6 +23,7 @@
 module dual_pueo_beam_v2
                       #(parameter INTYPE = "RAW",           // either RAW or POSTADD.
                         parameter CASCADE = "TRUE",         // first is false, everyone else is true
+                        parameter DEBUG = "FALSE",
                         // thank you, SystemVerilog 2009
                         localparam NBITS=5,
                         localparam NSAMP=8,
@@ -80,5 +81,14 @@ module dual_pueo_beam_v2
                      .trigger_o(trigger_o),
                      .ab_casc_i(thresh_casc_i),
                      .ab_casc_o(thresh_casc_o));
+                     
+    generate
+        if (DEBUG == "TRUE") begin : ILA
+            beam_ila u_ila(.clk(clk_i),
+                           .probe0(envelopeA[16:0]),
+                           .probe1(envelopeB[16:0]),
+                           .probe2(trigger_o));
+        end
+    endgenerate                     
     
 endmodule

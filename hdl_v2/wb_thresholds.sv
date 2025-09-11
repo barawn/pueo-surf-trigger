@@ -51,7 +51,8 @@ module wb_thresholds #(parameter WBCLKTYPE = "NONE",
     // address bit 9 splits between the thresholds and the subthresholds
     // This gives a max number of beams of 128, which is waaay more than we need. 
     wire [7:0] ram_wraddr = {wb_adr_i[3 +: 6], wb_adr_i[9], wb_adr_i[2]};
-    wire [31:0] ram_wrdata = { {14{1'b0}}, wb_dat_i[0 +: 18] };
+    // We hard-enforce that the thresholds written in must be unsigned 17 bits.
+    wire [31:0] ram_wrdata = { {15{1'b0}}, wb_dat_i[0 +: 17] };
     wire [31:0] ram_wr_readback;
 
     wire ram_wr;
@@ -144,6 +145,8 @@ module wb_thresholds #(parameter WBCLKTYPE = "NONE",
             if (wb_sel_i[0]) scaler_reset <= wb_dat_i[0];
         end
 
+        update_finished_wbclk <= { update_finished_wbclk[1:0], update_finished };
+
         scaler_write_bank <= scal_bank_i;
     end
 
@@ -165,6 +168,11 @@ module wb_thresholds #(parameter WBCLKTYPE = "NONE",
     localparam NDUALBEAMS = (NBEAMS/2) + (NBEAMS%2);
     localparam NUM_THRESH = NDUALBEAMS*2;
     localparam COUNTER_WIDTH = $clog2(NUM_THRESH);
+    
+    // Sigh. In the silly 2 beam case we need to jump to WRITE_LAST_SUBTHRESH
+    // from READ_TRIG. In the 4 beam case we need to jump to WRITE_SUBTHRESH.
+    // So we catch that here.
+    // It's actually NDUALBEAMS = 1 and NDUALBEAMS = 2.
     
     // timing (NUM_THRESH = 46)
     // clk  state                   read    dat     addr    storage next_write
@@ -294,8 +302,14 @@ module wb_thresholds #(parameter WBCLKTYPE = "NONE",
                 UPDATE_IDLE: if (do_update) ustate <= READ_PREP_0;
                 READ_PREP_0: ustate <= READ_PREP_1;
                 READ_PREP_1: ustate <= READ_SUBTHRESH;
-                READ_SUBTHRESH: ustate <= READ_TRIG;
-                READ_TRIG: ustate <= WRITE_SUBTHRESH_READ_NEXT;
+                READ_SUBTHRESH: ustate <= READ_TRIG;                    
+                // In the 2 threshold case we bounce straight to the last write.
+                // In the 4 threshold case we bounce to the termination branch.
+                // In every other case we go through the loop.
+                READ_TRIG: ustate <= (NUM_THRESH == 2 || NUM_THRESH == 4) ? 
+                    ( (NUM_THRESH == 2) ? WRITE_LAST_SUBTHRESH :
+                                          WRITE_SUBTHRESH) :
+                    WRITE_SUBTHRESH_READ_NEXT;
                 WRITE_SUBTHRESH_READ_NEXT: ustate <= WRITE_TRIG_READ_NEXT;
                 WRITE_TRIG_READ_NEXT: if (loop_complete) ustate <= WRITE_SUBTHRESH;
                                       else ustate <= WRITE_SUBTHRESH_READ_NEXT;
