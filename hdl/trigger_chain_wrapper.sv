@@ -1,7 +1,7 @@
 `timescale 1ns / 1ps
 `include "interfaces.vh"
 
-`define STARTSCALE 18'd1800
+`define STARTSCALE 18'd1500
 `define STARTOFFSET 16'd0
 
 // Pre-trigger filter chain.
@@ -10,6 +10,7 @@
 // 3) AGC and 12->5 bit conversion
 module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                                 parameter USE_BIQUADS = "FALSE",
+                                parameter HDL_FILTER_VERSION = "DEFAULT",
                                 parameter TARGET_RMS_SQUARED = 16,
                                 parameter RMS_SQUARE_SCALE_ERR = 0,
                                 parameter OFFSET_ERR = 5,
