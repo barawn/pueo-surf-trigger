@@ -207,15 +207,18 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
     generate
         genvar i;
         if (DEBUG == "TRUE") begin : DBG
+            // just cheat for now
+            localparam int DBG0 = 0;
+            localparam int DBG1 = 2;
             wire [1:0] trig_flag;
             wire [1:0] subthresh_flag;
-            flag_sync u_trig0_flag(.in_clkA(count_i[0]),.out_clkB(trig_flag[0]),
+            flag_sync u_trig0_flag(.in_clkA(count_i[DBG0]),.out_clkB(trig_flag[0]),
                                    .clkA(ifclk_i),.clkB(wb_clk_i));
-            flag_sync u_trig1_flag(.in_clkA(count_i[1]),.out_clkB(trig_flag[1]),
+            flag_sync u_trig1_flag(.in_clkA(count_i[DBG1]),.out_clkB(trig_flag[1]),
                                    .clkA(ifclk_i),.clkB(wb_clk_i));
-            flag_sync u_subt0_flag(.in_clkA(count_i[NBEAMS]),.out_clkB(subthresh_flag[0]),
+            flag_sync u_subt0_flag(.in_clkA(count_i[NBEAMS+DBG0]),.out_clkB(subthresh_flag[0]),
                                    .clkA(ifclk_i),.clkB(wb_clk_i));
-            flag_sync u_subt1_flag(.in_clkA(count_i[NBEAMS+1]),.out_clkB(subthresh_flag[1]),
+            flag_sync u_subt1_flag(.in_clkA(count_i[NBEAMS+DBG1]),.out_clkB(subthresh_flag[1]),
                                    .clkA(ifclk_i),.clkB(wb_clk_i));
                                    
             beamscaler_ila u_ila(.clk(wb_clk_i),
