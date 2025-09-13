@@ -101,6 +101,7 @@ module dual_pueo_threshold_v2 #(parameter CASCADE = "TRUE")(
                         .CEB2(dspA_CEB2),
                         .C( dspA_C ),
                         `D_UNUSED_PORTS,
+                        .CEC(1'b1),
                         .CEP(1'b1),
                         .ACIN( ab_casc_i[ 18 +: 30 ] ),
                         .BCIN( ab_casc_i[ 0 +: 18 ] ),
