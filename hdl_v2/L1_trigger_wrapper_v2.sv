@@ -89,6 +89,7 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
     // For now the AGC reset stuff is pulled from the generator.
     wire agc_reset;
     trigger_chain_x8_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
+                           .HDL_FILTER_VERSION("SYSTOLIC"),
                            .AGC_CONTROL(AGC_CONTROL),
                            .USE_BIQUADS(USE_BIQUADS),
                            .WBCLKTYPE(WBCLKTYPE),.CLKTYPE(CLKTYPE))
