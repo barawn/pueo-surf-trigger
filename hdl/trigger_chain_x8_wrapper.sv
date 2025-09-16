@@ -29,30 +29,7 @@ module trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
         output [7:0][39:0] dat_o 
     );
 
-    // QUALITY OF LIFE FUNCTIONS
-
-    // UNPACK is 128 -> 96
-    function [95:0] unpack;
-        input [127:0] data_in;
-        integer i;
-        begin
-            for (i=0;i<8;i=i+1) begin
-                unpack[12*i +: 12] = data_in[(16*i+4) +: 12];
-            end
-        end
-    endfunction
-    // PACK is 96 -> 128
-    function [127:0] pack;
-        input [95:0] data_in;
-        integer i;
-        begin
-            for (i=0;i<8;i=i+1) begin
-                pack[(16*i+4) +: 12] = data_in[12*i +: 12];
-                pack[(16*i) +: 4] = {4{1'b0}};
-            end
-        end
-    endfunction    
-
+    // drop pack/unpack, they're not needed in here
 
     localparam [21:0] CHAN_MASK = 22'h1c00; //0001 1100 0000 0000
 
