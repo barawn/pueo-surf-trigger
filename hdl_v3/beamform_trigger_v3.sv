@@ -163,6 +163,10 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
             // get the delay
             localparam int top_delay[0:1] = (FULL == "TRUE") ? TOP_ADDERS[t] :
                                                                TOP_ADDERS_DUMMY[t];
+            // Symmetric representation fix. Correct for adding
+            // 8 objects offset by -0.5.
+            localparam [4:0] sym_shift = 5'd4;
+
             for (t_ch=0;t_ch<2;t_ch=t_ch+1) begin : TC
                 int t_d = (NUM_SAMPLE_STORE-1)*NSAMP - top_delay[t_ch];
                 assign top_doublet_inputs[t][t_ch] = sample_store[TOP_INDICES[t_ch]][(t_d)*NBITS +: NSAMP*NBITS];
@@ -171,7 +175,7 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
             sub_beam u_tb(.clk_i(clk_i),
                           .chA_i(top_doublet_inputs[t][0]),
                           .chB_i(top_doublet_inputs[t][1]),
-                          .chC_i({NSAMP{5'd4}}),
+                          .chC_i({NSAMP{sym_shift}}),
                           .dat_o(top_doublets[t]));
         end
         // and now we build the beams
@@ -204,7 +208,11 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
             if (top_index < NUM_TOP_ADDERS) begin : RT
                 assign top_input = top_doublets[top_index];
             end else begin : FT
-                localparam [SB_BITS-1:0] filler = 'd4;
+                // With 6 inputs, we need to add the correction factor (6*0.5),
+                // but we also have to add the missing outputs to scale up so when we flip
+                // the top bit, it's correct. Our 6 inputs add up to 96, so we need
+                // another 32, so this is now 35.
+                localparam [SB_BITS-1:0] filler = 'd35;
                 assign top_input = {NSAMP{filler}};
             end
             
@@ -237,7 +245,11 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
                 if (top_index1 < NUM_TOP_ADDERS) begin : RT
                     assign top_input1 = top_doublets[top_index1];
                 end else begin : FT
-                    localparam [SB_BITS-1:0] filler = 'd4;
+                    // With 6 inputs, we need to add the correction factor (6*0.5),
+                    // but we also have to add the missing outputs to scale up so when we flip
+                    // the top bit, it's correct. Our 6 inputs add up to 96, so we need
+                    // another 32, so this is now 35.
+                    localparam [SB_BITS-1:0] filler = 'd35;
                     assign top_input1 = {NSAMP{filler}};
                 end
                 assign beam1 = { top_input1, right_input1, left_input1 };

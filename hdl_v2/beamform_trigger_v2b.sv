@@ -198,6 +198,9 @@ module beamform_trigger_v2b #(parameter FULL = "TRUE",
         for (d=0;d<NDOUBLETS;d=d+1) begin : D
             localparam int doublet_delay[0:1] = (FULL == "TRUE") ? doublet_delay_full[d] :
                                                                    doublet_delay_dummy[d];
+            // Symmetric representation fix. Correct for adding
+            // 8 objects offset by -0.5.
+            localparam [4:0] sym_shift = 5'd4;
             for (d_ch=0;d_ch<2;d_ch=d_ch+1) begin : C
                 localparam idx = (d_ch == 1) ? 4 : 0;
                 int a_d = (SAMPLE_STORE_DEPTH-1)*NSAMP - doublet_delay[d][d_ch];                
@@ -206,10 +209,11 @@ module beamform_trigger_v2b #(parameter FULL = "TRUE",
             sub_beam u_db(.clk_i(clk_i),
                           .chA_i(doublets_delayed[d][0]),
                           .chB_i(doublets_delayed[d][1]),
-                          .chC_i({NSAMP{5'd4}}),
+                          .chC_i({NSAMP{sym_shift}}),
                           .dat_o(doublets[d]));
         end
-        assign doublets[NDOUBLETS] = { {NSAMP{7'd4}} };
+        // the empty doublet
+        assign doublets[NDOUBLETS] = { {NSAMP{7'd35}} };
     endgenerate           
     
 endmodule
