@@ -2,15 +2,24 @@
 // takes in 8 channels worth of gt/lts and accumulates them
 // NBITS needs to be log2(nsamples)+1 - nsamples, NOT nclocks
 module probit_accumulator #(parameter NBITS=21,
+                            parameter NSAMP=8,
                             parameter CLKTYPE="NONE")(
         input clk_i,
         input ce_i,
         input rst_i,
-        input [7:0] gt_i,
-        input [7:0] lt_i,
+        input [NSAMP-1:0] gt_i,
+        input [NSAMP-1:0] lt_i,
         output [NBITS-1:0] gt_sum_o,
         output [NBITS-1:0] lt_sum_o
     );
+    // For NSAMP=4, we just duplicate the gt/lts to make the probit scales
+    // equivalent to the 8 sample case
+    if (!(NSAMP inside {4,8})) $error("Invalid number of samples");
+    
+    // For 4 samples, we just double-accumulate to keep all the logic
+    // the same. Not worth it otherwise.
+    wire [7:0] gt_full = (NSAMP == 4) ? {gt_i, gt_i} : gt_i;
+    wire [7:0] lt_full = (NSAMP == 4) ? {lt_i, lt_i} : lt_i;
     
     // we first pop gt/lt through a 3:2 and 5:3 compressor before accumulating them
     wire sum32_gt, carry32_gt;

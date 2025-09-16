@@ -6,7 +6,7 @@
 // The measurement and parameter stuff is elsewhere, since they're common.
 // The LFSR portion isn't common because it's so small that it's easier
 // to just duplicate it locally.
-    module agc_core #(parameter NBITS=12, 
+module agc_core #(parameter NBITS=12, 
                   parameter NSAMP=8,
                   parameter OBITS=5,
                   parameter SQ_BITS=25,

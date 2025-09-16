@@ -7,19 +7,25 @@
 //    fully 127 clocks (1016 samples) to fully repeat the channel select.
 //
 // this also only works on 4 bits because we've already abs-ed everything
-module lfsr_rms_mux(
+//
+// This only works on NSAMP = 8 and NSAMP =4. For NSAMP=4 we just
+// cheat and replicate them.
+module lfsr_rms_mux #(parameter NSAMP=8,
+                      localparam NBITS=4)(
         input clk_i,
-        input [31:0] in_i,
+        input [NSAMP*NBITS-1:0] in_i,
         input sync_i,
         input rst_i,
         output [3:0] out_o
     );
 
-    wire [3:0] in_vec[7:0];
+    if (!(NSAMP inside {4,8})) $error("Invalid number of samples.");
+    
+    wire [NSAMP-1:0] in_vec[7:0];
     generate
         genvar i;
         for (i=0;i<8;i=i+1) begin
-            assign in_vec[i] = in_i[4*i +: 4];
+            assign in_vec[i] = in_i[NBITS*i % NBITS*NSAMP +: 4];
         end
     endgenerate    
     wire [2:0] sample_select;
@@ -29,7 +35,7 @@ module lfsr_rms_mux(
                            .start_i(sync_i),
                            .out_o(sample_select));
 
-    reg [3:0] out_mux = {4{1'b0}};
+    reg [NBITS-1:0] out_mux = {NBITS{1'b0}};
     always @(posedge clk_i) begin
         out_mux <= in_vec[sample_select];
     end
