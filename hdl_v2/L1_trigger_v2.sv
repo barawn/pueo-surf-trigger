@@ -92,7 +92,7 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
     // this MUST be tclk
     generate
         if (TRIGGER_TYPE == "LF") begin : LF
-            beamform_trigger_lowampa
+            beamform_trigger_lowampa #(.NBEAMS(NBEAMS))
                 u_beam_trigger( .clk_i(tclk),
                                 .data_i(dat_i),
                                 .thresh_i(thresh_dat),
