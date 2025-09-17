@@ -10,7 +10,7 @@
 // - agc space       (0x4000 - 0x5FFF)
 // - biquad space    (0x6000 - 0x7FFF)
 module L1_trigger_wrapper_v2 #(parameter NBEAMS=2, 
-                    parameter USE_V3 = "TRUE",
+                    parameter TRIGGER_TYPE = "V3",                    
                     parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
                     parameter AGC_CONTROL = "TRUE",
                     parameter USE_BIQUADS = "FALSE",
@@ -40,7 +40,7 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
     );
     
     localparam AGC_BITS = 5;
-    localparam NSAMPS=8;
+    localparam NSAMPS=(TRIGGER_TYPE == "LF") ? 4 : 8;
 
     // our submodules 
    `DEFINE_WB_IF( thresh_ , 13, 32 );
@@ -67,7 +67,7 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
 
     // this is the threshold space
     L1_trigger_v2 #(.NBEAMS(NBEAMS),
-                    .USE_V3(USE_V3),
+                    .TRIGGER_TYPE(TRIGGER_TYPE),
                     .WBCLKTYPE(WBCLKTYPE),
                     .CLKTYPE(CLKTYPE),
                     .IFCLKTYPE(IFCLKTYPE))
@@ -88,22 +88,67 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
     // chain.
     // For now the AGC reset stuff is pulled from the generator.
     wire agc_reset;
-    trigger_chain_x8_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
-                           .HDL_FILTER_VERSION("SYSTOLIC"),
-                           .AGC_CONTROL(AGC_CONTROL),
-                           .USE_BIQUADS(USE_BIQUADS),
-                           .WBCLKTYPE(WBCLKTYPE),.CLKTYPE(CLKTYPE))
-            u_chain(
-                .wb_clk_i(wb_clk_i),
-                .wb_rst_i(wb_rst_i),
-                `CONNECT_WBS_IFM( wb_bq_ , bq_ ),//L
-                `CONNECT_WBS_IFM( wb_agc_ , agc_ ),
-                .reset_i(1'b0), 
-                .agc_reset_i(agc_reset),
-                .aclk(tclk),
-                .dat_i(dat_i),
-                .dat_o(data_stage_connection));
-      
+    generate
+        if (TRIGGER_TYPE == "LF") begin : LF
+        
+            wire [NCHAN-1:0][12*NSAMPS-1:0] dat_downsample;
+            function [12*NSAMPS-1:0] downsample;
+                    input [DAT_WIDTH-1:0] data_in;
+                    begin
+                        downsample = { data_in[6*12 +: 12],
+                                       data_in[4*12 +: 12],
+                                       data_in[2*12 +: 12],
+                                       data_in[0*12 +: 12] };
+                    end                                     
+            endfunction
+            
+            assign dat_downsample[0] = downsample(dat_i[0]);
+            assign dat_downsample[1] = downsample(dat_i[1]);
+            assign dat_downsample[2] = downsample(dat_i[2]);
+            assign dat_downsample[3] = downsample(dat_i[3]);
+            assign dat_downsample[4] = downsample(dat_i[4]);
+            assign dat_downsample[5] = downsample(dat_i[5]);
+            assign dat_downsample[6] = downsample(dat_i[6]);
+            assign dat_downsample[7] = downsample(dat_i[7]);
+            
+            // note note: this is an older wrapper, we should add the optional
+            // AGC control elimination parameter. We also need to recheck the AGC
+            // portion of this to make sure the syntax error stuff was cleaned up.
+            lowampa_trigger_chain_x8_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
+                                               .AGC_CONTROL(AGC_CONTROL),
+                                               .USE_BIQUADS(USE_BIQUADS),
+                                               .WBCLKTYPE(WBCLKTYPE),
+                                               .CLKTYPE(CLKTYPE))
+                    u_chain(
+                        .wb_clk_i(wb_clk_i),
+                        .wb_rst_i(wb_rst_i),
+                        `CONNECT_WBS_IFM( wb_bq_ , bq_ ),//L
+                        `CONNECT_WBS_IFM( wb_agc_ , agc_ ),
+                        .reset_i(1'b0), 
+                        .agc_reset_i(agc_reset),
+                        .aclk(tclk),
+                        .aclk_phase_i(aclk_phase_i),
+                        .dat_i(dat_downsample),
+                        .dat_o(data_stage_connection));
+        end else begin : MIE
+            trigger_chain_x8_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
+                                   .HDL_FILTER_VERSION("SYSTOLIC"),
+                                   .AGC_CONTROL(AGC_CONTROL),
+                                   .USE_BIQUADS(USE_BIQUADS),
+                                   .WBCLKTYPE(WBCLKTYPE),.CLKTYPE(CLKTYPE))
+                    u_chain(
+                        .wb_clk_i(wb_clk_i),
+                        .wb_rst_i(wb_rst_i),
+                        `CONNECT_WBS_IFM( wb_bq_ , bq_ ),//L
+                        `CONNECT_WBS_IFM( wb_agc_ , agc_ ),
+                        .reset_i(1'b0), 
+                        .agc_reset_i(agc_reset),
+                        .aclk(tclk),
+                        .dat_i(dat_i),
+                        .dat_o(data_stage_connection));
+        end
+    endgenerate        
+              
     // finally this is the generator space, which in V2 is embedded
     // in the trigger module.   
     // this also contains the AGC reset for no particularly good reason
@@ -112,7 +157,7 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
     // is built.
     generator_wrap #(.WBCLKTYPE(WBCLKTYPE),
                      .IFCLKTYPE(IFCLKTYPE),
-                     .USE_V3(USE_V3),
+                     .USE_V3(TRIGGER_TYPE == "V3" ? "TRUE" : "FALSE"),
                      .NBEAMS(NBEAMS))
         u_generator( .wb_clk_i(wb_clk_i),
                      `CONNECT_WBS_IFM( wb_ , generator_ ),

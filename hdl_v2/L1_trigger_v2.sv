@@ -3,12 +3,12 @@
 
 `define DLYFF #0.1
 module L1_trigger_v2 #(parameter NBEAMS=2, 
-                       parameter USE_V3 = "TRUE",
+                       parameter TRIGGER_TYPE = "V3",
                        parameter WBCLKTYPE = "NONE", 
                        parameter CLKTYPE = "NONE",
                        parameter IFCLKTYPE = "NONE",
                        localparam NCHAN=8,
-                       localparam NSAMP=8,
+                       localparam NSAMP=(TRIGGER_TYPE=="LF" ? 4 : 8),
                        localparam AGC_BITS=5)(
         input wb_clk_i,
         input wb_rst_i,
@@ -91,7 +91,16 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
     
     // this MUST be tclk
     generate
-        if (USE_V3 == "TRUE") begin : O3
+        if (TRIGGER_TYPE == "LF") begin : LF
+            beamform_trigger_lowampa
+                u_beam_trigger( .clk_i(tclk),
+                                .data_i(dat_i),
+                                .thresh_i(thresh_dat),
+                                .thresh_wr_i(thresh_wr),
+                                .thresh_update_i(thresh_update),
+                                .trigger_o(triggers));
+        end
+        else if (TRIGGER_TYPE == "V3") begin : O3
             beamform_trigger_v3 #(.FULL(NBEAMS == 2 ? "FALSE" : "TRUE"),
                                   .DEBUG(NBEAMS == 2 ? "TRUE" : "FALSE"))
                 u_beam_trigger( .clk_i(tclk),
