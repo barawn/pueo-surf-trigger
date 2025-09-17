@@ -6,6 +6,7 @@
 
 // 8 channels of trigger chain, with wisbone interconnect
 module lowampa_trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
+                                  parameter AGC_CONTROL = "FALSE",
                                   parameter USE_BIQUADS = "FALSE",
                                   parameter CLKTYPE = "NONE",
                                   parameter WBCLKTYPE = "NONE",
@@ -115,6 +116,7 @@ module lowampa_trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS
             assign wb_agc_connect_sel_o = wb_agc_sel_i;
 
             lowampa_trigger_chain_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
+                                    .AGC_CONTROL(AGC_CONTROL),
                                     .HDL_FILTER_VERSION(HDL_FILTER_VERSION),
                                     .USE_BIQUADS(USE_BIQUADS),
                                     .WBCLKTYPE(WBCLKTYPE),.CLKTYPE(CLKTYPE))
