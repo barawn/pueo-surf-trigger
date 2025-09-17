@@ -43,6 +43,7 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
     
     // QUALITY OF LIFE FUNCTIONS
 
+    // These stick around for the IP core filter version
     // UNPACK is 128 -> 96
     function [95:0] unpack_le;  // 12 LSBs every 16
         input [127:0] data_in;
@@ -62,30 +63,6 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
             for (i=0;i<8;i=i+1) begin
                 pack_le[16*i +: 12] = data_in[12*i +: 12];
                 pack_le[(16*i + 12) +: 4] = {4{1'b0}};
-            end
-        end
-    endfunction    
-
-
-    // UNPACK is 128 -> 96
-    function [95:0] unpack;
-        input [127:0] data_in;
-        integer i;
-        begin
-            for (i=0;i<8;i=i+1) begin
-                unpack[12*i +: 12] = data_in[(16*i+4) +: 12];
-            end
-        end
-    endfunction
-
-    // PACK is 96 -> 128
-    function [127:0] pack;
-        input [95:0] data_in;
-        integer i;
-        begin
-            for (i=0;i<8;i=i+1) begin
-                pack[(16*i+4) +: 12] = data_in[12*i +: 12];
-                pack[(16*i) +: 4] = {4{1'b0}};
             end
         end
     endfunction    
