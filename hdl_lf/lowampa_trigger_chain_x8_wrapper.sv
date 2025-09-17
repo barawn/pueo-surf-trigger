@@ -27,6 +27,7 @@ module lowampa_trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS
         
         // Control to capture the output to the RAM buffer
         input reset_i, 
+        input agc_reset_i,
         input aclk,
         input aclk_phase_i,
 
@@ -126,6 +127,7 @@ module lowampa_trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS
                 `CONNECT_WBS_IFM( wb_bq_ , wb_bq_connect_ ),
                 `CONNECT_WBS_IFM( wb_agc_controller_ , wb_agc_connect_ ),
                 .reset_i(reset_i), 
+                .agc_reset_i(agc_reset_i),
                 .aclk(aclk),
                 .aclk_phase(aclk_phase_i),
                 .dat_i(dat_i[idx]),
