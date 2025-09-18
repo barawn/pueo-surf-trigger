@@ -490,6 +490,8 @@ module lowampa_trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS =
     endgenerate        
 
     agc_wrapper #(.TIMESCALE_REDUCTION((2**AGC_TIMESCALE_REDUCTION_BITS)),
+                  .CLKTYPE(CLKTYPE),
+                  .WBCLKTYPE(WBCLKTYPE),
                   .NSAMP(4))
      u_agc_wrapper(
         .wb_clk_i(wb_clk_i),
