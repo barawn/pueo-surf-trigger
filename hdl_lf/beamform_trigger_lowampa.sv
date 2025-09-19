@@ -57,18 +57,18 @@ module beamform_trigger_lowampa #(  parameter NBEAMS = 2,
     generate
 
         // Vectorize for debugging
-        for(beam_idx=0; beam_idx<NBEAMS; beam_idx++) begin
-            for(chan_idx=0; chan_idx<NCHAN; chan_idx++) begin
+        for(beam_idx=0; beam_idx<NBEAMS; beam_idx++) begin : VB
+            for(chan_idx=0; chan_idx<NCHAN; chan_idx++) begin : VC
                 assign beam_use_array[beam_idx][chan_idx] = beam_use_array_flipped[beam_idx][NCHAN-1-chan_idx]; 
                 assign beam_inv_array[beam_idx][chan_idx] = beam_inv_array_flipped[beam_idx][NCHAN-1-chan_idx]; 
-                for(samp_idx=0; samp_idx<NSAMP; samp_idx++) begin
+                for(samp_idx=0; samp_idx<NSAMP; samp_idx++) begin : VS
                     assign vectorized_delayed_data[beam_idx][chan_idx][samp_idx] = beams_delayed[beam_idx][chan_idx][samp_idx*NBITS +: NBITS];
                 end
             end
         end
 
         for(beam_idx=0; beam_idx<NBEAMS; beam_idx++) begin : ALIGNMENT
-            for(chan_idx=0; chan_idx<NCHAN; chan_idx++) begin
+            for(chan_idx=0; chan_idx<NCHAN; chan_idx++) begin : CH
                 // The first term below makes sure that antenna 0 always has a delay of 8. 
                 // If another antenna has a delay of 0, as long as antenna 0 has a max delay < 8 all should be good.
                 int sample_delay = (SAMPLE_STORE_DEPTH-2)*NSAMP - ((72 - delay_array[beam_idx][0]) + delay_array[beam_idx][chan_idx]);
@@ -130,8 +130,8 @@ module beamform_trigger_lowampa #(  parameter NBEAMS = 2,
 
 
         // RIGHT NOW THE SAMPLES RUN IN REVERSE....
-        for(chan_idx=0; chan_idx<NCHAN; chan_idx++) begin
-            for(clock_idx=SAMPLE_STORE_DEPTH-2; clock_idx>=0;clock_idx--) begin
+        for(chan_idx=0; chan_idx<NCHAN; chan_idx++) begin : CH
+            for(clock_idx=SAMPLE_STORE_DEPTH-2; clock_idx>=0;clock_idx--) begin : LP
                 always @(posedge clk_i) begin: SHIFT_SAMPLE_STORE
                     sample_store[chan_idx][clock_idx*NSAMP*NBITS +: NSAMP*NBITS] <= sample_store[chan_idx][(clock_idx+1)*NSAMP*NBITS +: NSAMP*NBITS]; // Shift over
                 end
