@@ -7,6 +7,29 @@
 //
 // outA_o/outB_o are just there for debugging - if needed we could
 // throw them into an ILA or something.
+//
+// NOTE: This module is modified slightly from the original lowampa
+// (which added selectable channel usage and inversion) to fix the
+// offset. When adding 5 channels together in the symmetric rep,
+// the output is actually "value - 2.5". We can't shift it up easily
+// because that puts us outside the range of the signed 8b square.
+// The extra 0.5 might seem unimportant but it makes +/- asymmetric,
+// because we're rounding down - we really would want to round
+// towards zero or something.
+//
+// But all of the easy options require similar effort and a bit of thought:
+// - rounding takes an adder and some thought
+// - absolute value takes an adder and a differently-optimized square
+// Another option is just to pipe the sum and add it to the square output,
+// because (x - 0.5)^2 = x^2 - x - 0.25, so to correct it we just need
+// to add back x. The 0.25 is unimportant because it just becomes an offset
+// shift in the threshold. This is cost-wise a little worse than say rounding
+// or the absval option but it's faster to implement. 
+
+// NOTE NOTE NOTE NOTE NOTE:
+// UNLIKE dual_pueo_beamform_v2 THESE OUTPUTS ARE NO LONGER
+// INTEGER SQUARES! THIS MEANS YOU CANNOT DO TRICKS TO SAVE
+// RESOURCES (e.g. drop bit 1).
 module dual_pueo_beamform_lowampa_v2
                       #(parameter INTYPE = "RAW",
                         // thank you, SystemVerilog 2009
@@ -61,6 +84,14 @@ module dual_pueo_beamform_lowampa_v2
         end
         // sample loop is the outer b/c once we beamform the channels disappear
         for (jj=0;jj<NSAMP;jj=jj+1) begin : SV
+            // temp storage to correct the square
+            reg [NBITS+2:0] beamA_store = {(NBITS+3){1'b0}};
+            reg [NBITS+2:0] beamB_store = {(NBITS+3){1'b0}};
+            // sign extend 8 bits to 14.
+            wire [13:0] beamA_store_se = { {(14-(NBITS+3)){beamA_store[NBITS+2]}}, beamA_store };
+            wire [13:0] beamB_store_se = { {(14-(NBITS+3)){beamB_store[NBITS+2]}}, beamB_store };
+            reg [13:0] beamA_sq_correct = {14{1'b0}};
+            reg [13:0] beamB_sq_correct = {14{1'b0}};
             // We have 2 separate input types: either we're given the raw inputs (8 channels, 8 samples, 5 bits each)
             // or a selection of postadder inputs (3 adders, 8 samples, 7 bits each).
             // The postadder input version fixes Vivado's lack of resource sharing detection.
@@ -142,12 +173,25 @@ module dual_pueo_beamform_lowampa_v2
                 .out_o(beamB_sqout[jj])); // [14:0] , although the top (15th) bit will never be set for our symmetric representation value range, so drop it
             assign beamB_sq[jj] = beamB_sqout[jj][13:0]; // slicing off top bit
 
+            always @(posedge clk_i) begin : CORR
+                beamA_store <= beamA_signed[jj];
+                beamB_store <= beamB_signed[jj];
+                
+                // Adjust to fix the missing offset.
+                // Note that this means our outputs are NOT integer squares
+                // anymore!!
+                beamA_sq_correct <= beamA_sqout[jj][13:0] + beamA_store_se;
+                beamB_sq_correct <= beamB_sqout[jj][13:0] + beamB_store_se;
+            end
+
             //assign outA_o[(NBITS+3)*jj +: (NBITS+3)] = beamA_signed[jj];
             assign outB_o[(NBITS+3)*jj +: (NBITS+3)] = beamB_signed[jj];
 
             //actually (signed-.5)^2 = signed^2 - signed +.25 add back in signed value to re-center
-            assign sq_outA_o[OUTBITS*jj +: OUTBITS] = beamA_sqout[jj];//+{{(OUTBITS-NBITS-3){beamA_signed[jj][NBITS+2]}}, beamA_signed[jj][NBITS+2:0]};
-            assign sq_outB_o[OUTBITS*jj +: OUTBITS] = beamB_sqout[jj];//+{{(OUTBITS-NBITS-3){beamB_signed[jj][NBITS+2]}}, beamB_signed[jj][NBITS+2:0]};
+//            assign sq_outA_o[OUTBITS*jj +: OUTBITS] = beamA_sqout[jj];//+{{(OUTBITS-NBITS-3){beamA_signed[jj][NBITS+2]}}, beamA_signed[jj][NBITS+2:0]};
+//            assign sq_outB_o[OUTBITS*jj +: OUTBITS] = beamB_sqout[jj];//+{{(OUTBITS-NBITS-3){beamB_signed[jj][NBITS+2]}}, beamB_signed[jj][NBITS+2:0]};
+            assign sq_outA_o[OUTBITS*jj +: OUTBITS] = beamA_sq_correct;
+            assign sq_outB_o[OUTBITS*jj +: OUTBITS] = beamB_sq_correct;
         end        
     endgenerate
     
