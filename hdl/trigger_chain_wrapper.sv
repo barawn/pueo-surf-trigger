@@ -18,7 +18,8 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                                 parameter STARTING_OFFSET_DELTA = 25,
                                 parameter WBCLKTYPE = "PSCLK",
                                 parameter CLKTYPE = "ACLK",
-                                parameter AGC_CONTROL = "FALSE")(  
+                                parameter AGC_CONTROL = "FALSE",
+                                parameter USE_TAIL_FRACTION = "FALSE")(  
 
 
         input wb_clk_i,
@@ -74,6 +75,9 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
 
     // WB interface to actual AGC module
     `DEFINE_WB_IF( wb_agc_module_ , 8, 32);
+
+    localparam TAIL_FRACTION_TARGET = 63742 / (2**AGC_TIMESCALE_REDUCTION_BITS);//131072*8*0.06079 (+-1.875sigma 2 sided p-value);
+    localparam TAIL_FRACTION_ERR = TAIL_FRACTION_TARGET/1000;
 
     generate
         if (AGC_CONTROL == "TRUE") begin : AGCC
@@ -331,20 +335,35 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                             // Will figure out multiplication in the future
                             // For now just simply raise or lower by set amount
         
-        
-        
-                            // SCALE
-                            if(agc_sq_adjusted > (TARGET_RMS_SQUARED + RMS_SQUARE_SCALE_ERR)) begin
-                                if(agc_module_info_reg[4] > 17'h0012C) begin // Cutoff
-                                    agc_recalculated_scale_reg = agc_module_info_reg[4] - agc_control_scale_delta;
-                                end else begin
-                                    agc_recalculated_scale_reg = agc_module_info_reg[4];
+                            if (USE_TAIL_FRACTION == "TRUE") begin : AGC_TAIL_FRACTION_CONTROL
+                                // SCALE
+                                if((agc_module_info_reg[2] + agc_module_info_reg[3]) > (TAIL_FRACTION_TARGET+TAIL_FRACTION_ERR)) begin
+                                    if(agc_module_info_reg[4] > 17'h0012C) begin // Cutoff
+                                        agc_recalculated_scale_reg = agc_module_info_reg[4] - agc_control_scale_delta;
+                                    end else begin
+                                        agc_recalculated_scale_reg = agc_module_info_reg[4];
+                                    end
+                                end else if((agc_module_info_reg[2] + agc_module_info_reg[3]) < (TAIL_FRACTION_TARGET-TAIL_FRACTION_ERR)) begin
+                                    if(agc_module_info_reg[4] < 17'h1FBD0) begin // Cutoff
+                                        agc_recalculated_scale_reg = agc_module_info_reg[4] + agc_control_scale_delta;
+                                    end else begin
+                                        agc_recalculated_scale_reg = agc_module_info_reg[4];
+                                    end
                                 end
-                            end else if(agc_sq_adjusted < (TARGET_RMS_SQUARED - RMS_SQUARE_SCALE_ERR)) begin
-                                if(agc_module_info_reg[4] < 17'h1FBD0) begin // Cutoff
-                                    agc_recalculated_scale_reg = agc_module_info_reg[4] + agc_control_scale_delta;
-                                end else begin
-                                    agc_recalculated_scale_reg = agc_module_info_reg[4];
+                            end else begin: AGC_RMS_CONTROL
+                                // SCALE
+                                if(agc_sq_adjusted > (TARGET_RMS_SQUARED + RMS_SQUARE_SCALE_ERR)) begin
+                                    if(agc_module_info_reg[4] > 17'h0012C) begin // Cutoff
+                                        agc_recalculated_scale_reg = agc_module_info_reg[4] - agc_control_scale_delta;
+                                    end else begin
+                                        agc_recalculated_scale_reg = agc_module_info_reg[4];
+                                    end
+                                end else if(agc_sq_adjusted < (TARGET_RMS_SQUARED - RMS_SQUARE_SCALE_ERR)) begin
+                                    if(agc_module_info_reg[4] < 17'h1FBD0) begin // Cutoff
+                                        agc_recalculated_scale_reg = agc_module_info_reg[4] + agc_control_scale_delta;
+                                    end else begin
+                                        agc_recalculated_scale_reg = agc_module_info_reg[4];
+                                    end
                                 end
                             end
         
