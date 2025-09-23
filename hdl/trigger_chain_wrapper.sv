@@ -104,6 +104,7 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
         
             (* CUSTOM_CC_DST = WBCLKTYPE *)
             reg [5:0][31:0] agc_module_info_reg = {(6*32){1'b0}}; // Store of downstream AGC info
+            // Shift down by 17, since 2^17 = 131072 is the number of accumulation clocks
             wire[24:0] agc_sq_adjusted = {{(17-AGC_TIMESCALE_REDUCTION_BITS){1'd0}},{agc_module_info_reg[1][24:17-AGC_TIMESCALE_REDUCTION_BITS]}};
         
         

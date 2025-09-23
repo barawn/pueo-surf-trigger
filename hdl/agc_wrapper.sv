@@ -163,7 +163,7 @@ module agc_wrapper #(parameter WBCLKTYPE = "PSCLK",
     always @(posedge aclk) agc_done_delay <= { agc_done_delay[4:0], agc_time_done };
     assign agc_done_aclk = agc_done_delay[5];
     dsp_counter_terminal_count #(.FIXED_TCOUNT("TRUE"),
-                                 .FIXED_TCOUNT_VALUE(131072/TIMESCALE_REDUCTION),
+                                 .FIXED_TCOUNT_VALUE(131072/TIMESCALE_REDUCTION), // 131072 is 2^17
                                  .HALT_AT_TCOUNT("TRUE"))
             u_agc_timer(.clk_i(aclk),
                         .rst_i(agc_tick_aclk),
