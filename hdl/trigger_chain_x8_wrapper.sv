@@ -8,6 +8,7 @@
 
 module trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
                                   parameter USE_BIQUADS = "FALSE",
+                                  parameter USE_TAIL_FRACTION = "FALSE",
                                   parameter HDL_FILTER_VERSION = "DEFAULT",
                                   parameter CLKTYPE = "NONE",
                                   parameter AGC_CONTROL = "FALSE",
@@ -112,6 +113,7 @@ module trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
 
             trigger_chain_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
                                     .USE_BIQUADS(USE_BIQUADS),
+                                    .USE_TAIL_FRACTION(USE_TAIL_FRACTION),
                                     .HDL_FILTER_VERSION(HDL_FILTER_VERSION),
                                     .AGC_CONTROL(AGC_CONTROL),
                                     .WBCLKTYPE(WBCLKTYPE),.CLKTYPE(CLKTYPE))

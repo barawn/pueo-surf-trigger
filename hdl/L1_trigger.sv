@@ -11,6 +11,7 @@ module L1_trigger #(parameter NBEAMS=2,
                     parameter ZERO_IS_FAKE="FALSE",
                     parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
                     parameter USE_BIQUADS = "FALSE",
+                    parameter USE_TAIL_FRACTION = "FALSE",
                     parameter HDL_FILTER_VERSION = "DEFAULT",
                     parameter WBCLKTYPE = "PSCLK", parameter CLKTYPE = "ACLK",
                     parameter AGC_CONTROL = "FALSE",
@@ -268,10 +269,11 @@ module L1_trigger #(parameter NBEAMS=2,
     `endif
 
 
-    trigger_chain_x8_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
+    trigger_chain_x8_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS), 
                                .AGC_CONTROL(AGC_CONTROL),
                                .HDL_FILTER_VERSION(HDL_FILTER_VERSION),
                                .USE_BIQUADS(USE_BIQUADS),
+                               .USE_TAIL_FRACTION(USE_TAIL_FRACTION),
                                .WBCLKTYPE(WBCLKTYPE),.CLKTYPE(CLKTYPE))
                 u_chain(
                     .wb_clk_i(wb_clk_i),
