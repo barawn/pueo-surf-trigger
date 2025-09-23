@@ -474,7 +474,7 @@ module L1_trigger_wrapper #(parameter NBEAMS=2,
 
     L1_trigger #(   .AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS), 
                     .USE_BIQUADS(USE_BIQUADS),
-                    .USE_TAIL_FRACTION(USE_TAIL_FRACTION,
+                    .USE_TAIL_FRACTION(USE_TAIL_FRACTION),
                     .HDL_FILTER_VERSION(HDL_FILTER_VERSION),
                     .WBCLKTYPE(WBCLKTYPE),
                     .AGC_CONTROL(AGC_CONTROL),
