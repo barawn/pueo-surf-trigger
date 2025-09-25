@@ -45,8 +45,8 @@ module dual_pueo_beam_lowampa_v2
         output [3:0] trigger_o,         //! raw trigger output
         
         input [47:0] thresh_casc_i,     //! only used if CASCADE is true
-        output [47:0] thresh_casc_o//,
-        //output [207:0] debug_envelope
+        output [47:0] thresh_casc_o,
+        output [223:0] debug_envelope
     );
 
     wire [NSAMP-1:0][13:0] squareA;     //! 8 samples of the squared beam for beam A
@@ -59,7 +59,7 @@ module dual_pueo_beam_lowampa_v2
     wire [17:0] envelopeB; //! Formed envelope for beam B
     
     //assign debug_envelope = {{2{squareA[3][13]}},squareA[3],{2{squareA[2][13]}},squareA[2],{2{squareA[1][13]}},squareA[1],{2{squareA[0][13]}},squareA[0],dbgA};
-    //assign debug_envelope = {envelopeA[16:1],{2{squareA[3][13]}},squareA[3],{2{squareA[2][13]}},squareA[2],{2{squareA[1][13]}},squareA[1],{2{squareA[0][13]}},squareA[0],dbgA}; 
+    assign debug_envelope = {envelopeB[16:1],envelopeA[16:1],{2{squareA[3][13]}},squareA[3],{2{squareA[2][13]}},squareA[2],{2{squareA[1][13]}},squareA[1],{2{squareA[0][13]}},squareA[0],dbgA}; 
     
     dual_pueo_beamform_lowampa_v2 #(.INTYPE(INTYPE))
         u_beamform(.clk_i(clk_i),

@@ -39,7 +39,7 @@ module lowampa_trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS =
         input aclk,
         input aclk_phase,
         input [NSAMP*NBITS-1:0] dat_i,
-        
+        output [1:0][47:0] dat_debug,
         output [NSAMP*OUTBITS-1:0] dat_o
     );
 
@@ -432,6 +432,9 @@ module lowampa_trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS =
         pipe_to_filter <= lpf_out;
         pipe_to_biquad <= match_out;        
     end 
+    
+    assign dat_debug[0] = {{7{dat_o[19]}},dat_o[19:15],{7{dat_o[14]}},dat_o[14:10],{7{dat_o[9]}},dat_o[9:5],{7{dat_o[4]}},dat_o[4:0]};
+    assign dat_debug[1] = pipe_to_biquad;
 
     // Low pass filter
     generate
@@ -495,7 +498,7 @@ module lowampa_trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS =
                   .NSAMP(4))
      u_agc_wrapper(
         .wb_clk_i(wb_clk_i),
-        .wb_rst_i(wb_rst_i),        
+        .wb_rst_i(wb_rst_i),
         `CONNECT_WBS_IFM( wb_ , wb_agc_module_ ),
         .aclk(aclk),
         .aresetn(reset_i),

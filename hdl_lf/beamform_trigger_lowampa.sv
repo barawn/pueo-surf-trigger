@@ -23,7 +23,8 @@ module beamform_trigger_lowampa #(  parameter NBEAMS = 2,
         input [1:0] thresh_wr_i,
         input [1:0] thresh_update_i,        
         
-        output [NBEAMS-1:0] trigger_o
+        output [NBEAMS-1:0] trigger_o,
+        output [223:0] debug_envelope
     );
 
     // Moving these to localparams, since this module will break with unexpected values.
@@ -94,7 +95,8 @@ module beamform_trigger_lowampa #(  parameter NBEAMS = 2,
                             .thresh_update_i(thresh_update_i),        
                             .thresh_casc_i(cascade[beam_idx]),
                             .thresh_casc_o(cascade[(beam_idx + 2) % NBEAMS]),
-                            .trigger_o(trigger_out)
+                            .trigger_o(trigger_out),
+                            .debug_envelope(debug_envelope)
                         );                
                         assign trigger_o[beam_idx + 0] = trigger_out[0];
                         assign trigger_o[beam_idx + 1] = trigger_out[2];

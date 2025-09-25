@@ -32,7 +32,8 @@ module lowampa_trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS
         input aclk_phase_i,
 
         input [NCHAN-1:0][NBITS*NSAMP-1:0] dat_i ,
-        output [NCHAN-1:0][OUTBITS*NSAMP-1:0] dat_o 
+        output [NCHAN-1:0][OUTBITS*NSAMP-1:0] dat_o,
+        output [3:0][1:0][47:0] dat_debug
     );
 
     // pack and unpack can be dropped, were for old stuff
@@ -131,7 +132,8 @@ module lowampa_trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS
                 .aclk(aclk),
                 .aclk_phase(aclk_phase_i),
                 .dat_i(dat_i[idx]),
-                .dat_o(dat_o[idx]));
+                .dat_o(dat_o[idx]),
+                .dat_debug(dat_debug[((idx[0]==0)?idx[2:1]:idx[2:1]+4)]));
             end;
     endgenerate
 
