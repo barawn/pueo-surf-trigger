@@ -4,7 +4,7 @@
 
 `define DLYFF #0.1
 
-module lowampa_trigger_wrapper #(parameter NBEAMS=2, 
+module lowampa_trigger_wrapper #(parameter NBEAMS=48, 
                     parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
                     parameter AGC_CONTROL = "TRUE",
                     parameter USE_BIQUADS = "FALSE",
@@ -32,7 +32,7 @@ module lowampa_trigger_wrapper #(parameter NBEAMS=2,
 
         `HOST_NAMED_PORTS_AXI4S_MIN_IF(m_trig_ , 32),
         output [3:0][1:0][47:0] dat_debug,
-        output [223:0] debug_envelope
+        output [255:0] debug_envelope
     );
     
     localparam AGC_BITS = 5;

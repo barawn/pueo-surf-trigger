@@ -24,7 +24,7 @@ module lowampa_trigger #(parameter NBEAMS=54,
         input aclk_phase_i,
         input ifclk,
         output [NBEAMS-1:0] trigger_o,
-        output [223:0] debug_envelope,
+        output [255:0] debug_envelope,
         output trigger_count_done_o
     );
     

@@ -24,7 +24,7 @@ module beamform_trigger_lowampa #(  parameter NBEAMS = 2,
         input [1:0] thresh_update_i,        
         
         output [NBEAMS-1:0] trigger_o,
-        output [223:0] debug_envelope
+        output [255:0] debug_envelope
     );
 
     // Moving these to localparams, since this module will break with unexpected values.
@@ -80,6 +80,7 @@ module beamform_trigger_lowampa #(  parameter NBEAMS = 2,
         for(beam_idx=0; beam_idx<NBEAMS; beam_idx = beam_idx+2) begin: DUAL_BEAMFORMERS
             if(beam_idx+1<NBEAMS) begin: DUAL_USE
                 wire [3:0] trigger_out;
+                wire [255:0] debug_envelope_temp;
                 dual_pueo_beam_lowampa_v2 #(.INTYPE("RAW"),
                                     .DEBUG(DEBUG),
                                     .CASCADE(beam_idx == 0 ? "FALSE" : "TRUE"))
@@ -96,8 +97,13 @@ module beamform_trigger_lowampa #(  parameter NBEAMS = 2,
                             .thresh_casc_i(cascade[beam_idx]),
                             .thresh_casc_o(cascade[(beam_idx + 2) % NBEAMS]),
                             .trigger_o(trigger_out),
-                            .debug_envelope(debug_envelope)
-                        );                
+                            .debug_envelope(debug_envelope_temp)
+                        );
+                        if(beam_idx==0)
+                        begin
+                          assign debug_envelope = debug_envelope_temp;
+                          //assign debug_envelope[beam_idx*32 +:32] = debug_envelope_temp;
+                        end
                         assign trigger_o[beam_idx + 0] = trigger_out[0];
                         assign trigger_o[beam_idx + 1] = trigger_out[2];
                         assign trigger_o[NBEAMS + beam_idx + 0] = trigger_out[1];
