@@ -23,6 +23,7 @@ module lowampa_trigger_wrapper #(parameter NBEAMS=48,
         input aclk_phase_i,
         
         input tclk,
+        input tclk_resetn,
         input [NCHAN-1:0][DAT_WIDTH-1:0] dat_i,
         
         input ifclk,
@@ -34,7 +35,7 @@ module lowampa_trigger_wrapper #(parameter NBEAMS=48,
         output [3:0][1:0][47:0] dat_debug,
         output [255:0] debug_envelope
     );
-    
+        
     localparam AGC_BITS = 5;
     localparam NSAMPS=4;
 
@@ -71,6 +72,7 @@ module lowampa_trigger_wrapper #(parameter NBEAMS=48,
                   `CONNECT_WBS_IFM( wb_ , thresh_ ),
                   
                   .tclk(tclk),
+                  .tclk_resetn(tclk_resetn),
                   .dat_i(data_stage_connection),
                   
                   .aclk(aclk),

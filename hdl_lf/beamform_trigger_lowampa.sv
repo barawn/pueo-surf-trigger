@@ -17,6 +17,7 @@ module beamform_trigger_lowampa #(  parameter NBEAMS = 2,
                                     localparam NSAMP=4, 
                                     localparam NCHAN=8) (
         input clk_i,
+        input rst_i,
         input [NCHAN-1:0][NSAMP*NBITS-1:0] data_i,
 
         input [18*2-1:0] thresh_i,
@@ -85,6 +86,7 @@ module beamform_trigger_lowampa #(  parameter NBEAMS = 2,
                                     .DEBUG(DEBUG),
                                     .CASCADE(beam_idx == 0 ? "FALSE" : "TRUE"))
                  u_beamform(.clk_i(clk_i),
+                            .rst_i(rst_i),
                             .beamA_i(beams_delayed[beam_idx + 0]), // Beam A corresponds to the MSB of the trigger bits
                             .beamA_use(beam_use_array[beam_idx+0]),
                             .beamA_invert(beam_inv_array[beam_idx+0]),

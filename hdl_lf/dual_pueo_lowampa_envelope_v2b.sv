@@ -36,12 +36,36 @@ module dual_pueo_lowampa_envelope_v2b #(localparam NBITS=14,
                                         parameter OUTBITS=17,
                                         parameter OUTSHIFT=3)(
         input clk_i,
+        input rst_i,
         input [NBITS*NSAMP-1:0] squareA_i,
         input [NBITS*NSAMP-1:0] squareB_i,
         
         output [OUTBITS-1:0] envelopeA_o,
         output [OUTBITS-1:0] envelopeB_o        
     );
+    
+    // The sum fundamentally is an IIR with compensating
+    // FIR terms to generate the running sum. IIRs obviously
+    // have trouble if the clock isn't stable, so we need
+    // a reset if something's not locked.
+    //
+    // We stretch the hell out of the reset just to be safe.
+    // We only really need to reset the final DSP. Everyone else
+    // just freely clocks and eventually clears out well before
+    // we hit the 16-clock reset anyway.
+    reg [1:0] sum_reset_fall = 0;
+    reg sum_reset = 0;
+    reg [4:0] sum_reset_counter = {5{1'b0}};
+    
+    always @(posedge clk_i) begin
+        sum_reset_fall <= { sum_reset_fall[0], rst_i };
+        
+        if (sum_reset_fall[1] && !sum_reset_fall[0]) sum_reset <= 1;
+        else if (sum_reset_counter[4]) sum_reset <= 0;
+        
+        if (sum_reset) sum_reset_counter <= sum_reset_counter[3:0] + 1;
+        else sum_reset_counter <= {5{1'b0}};
+    end
     
     // We sum everything using 4 DSPs, which gives us 8 total add slots.
     // We add each sample in 4 of them and subtract the delayed version
@@ -177,10 +201,14 @@ module dual_pueo_lowampa_envelope_v2b #(localparam NBITS=14,
     two24_dsp #(.ABREG(1),
                 .CREG(1),
                 .PREG(1),
+                .USE_RST(1),
                 .CASCADE("TRUE"),
                 .OPMODE(dspD_OPMODE),
                 .ALUMODE(dspD_ALUMODE))
                 u_dspD(.clk_i(clk_i),
+                       .rst_ab_i(1'b0),
+                       .rst_c_i(1'b0),
+                       .rst_p_i(sum_reset),
                        .AB_i(dspD_AB),
                        .C_i(dspD_C),
                        .pc_i(dspC_to_dspD),
