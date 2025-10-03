@@ -31,6 +31,7 @@ module dual_pueo_beam_lowampa_v2
                         localparam INBITS = (INTYPE == "RAW") ? NCHAN*NSAMP*NBITS : 3*NSAMP*(NBITS+2)
                         ) (
         input clk_i,
+        input rst_i,
         input [INBITS-1:0] beamA_i,
         input [NCHAN-1:0] beamA_use,
         input [NCHAN-1:0] beamA_invert,
@@ -76,6 +77,7 @@ module dual_pueo_beam_lowampa_v2
 
     dual_pueo_lowampa_envelope_v2b
         u_envelope(.clk_i(clk_i),
+                   .rst_i(rst_i),
                    .squareA_i(squareA),
                    .squareB_i(squareB),
                    .envelopeA_o( envelopeA[16:0] ),

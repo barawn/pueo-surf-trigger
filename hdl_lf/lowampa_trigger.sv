@@ -17,7 +17,8 @@ module lowampa_trigger #(parameter NBEAMS=54,
         input wb_rst_i,
         `TARGET_NAMED_PORTS_WB_IF( wb_ , 13, 32 ),
 
-        input tclk,        
+        input tclk,
+        input tclk_resetn,
         input [NCHAN-1:0][AGC_BITS*NSAMP-1:0] dat_i,
         
         input aclk,
@@ -96,6 +97,7 @@ module lowampa_trigger #(parameter NBEAMS=54,
     beamform_trigger_lowampa #(.NBEAMS(NBEAMS))//,
                           //.ZERO_IS_FAKE(ZERO_IS_FAKE))
         u_beam_trigger( .clk_i(tclk),
+                        .rst_i(!tclk_resetn),
                         .data_i(dat_i),
                         .thresh_i(thresh_dat),
                         .thresh_wr_i(thresh_wr),
