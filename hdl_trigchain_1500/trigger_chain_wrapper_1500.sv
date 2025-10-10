@@ -475,7 +475,7 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
         for (ii=0;ii<8;ii=ii+1) begin : LP
             assign lpf_out[12*ii +: 12] = lpf_out_tmp[ii][11:0];
         end
-    generate
+    endgenerate
     // Matched Filter    
     matched_filter_v3_1500 u_matched_filter(
         .aclk(aclk),

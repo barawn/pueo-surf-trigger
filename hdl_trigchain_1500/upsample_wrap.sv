@@ -6,6 +6,9 @@ module upsample_wrap(
         output [95:0] data_o
     );
     
+    // group delay of the filter. 
+    localparam GD = 14;
+    
     wire [95:0] to_filter = {
         {12{1'b0}},
         data_i[36 +: 12],
@@ -16,14 +19,14 @@ module upsample_wrap(
         {12{1'b0}},
         data_i[0 +: 12] };    
     wire [95:0] from_filter;    
-    // we need a 12 clock delay = address = 10 in SRL
+    // we need a 14 clock delay = address = 12 in SRL
     // plus FF
     wire [47:0] srlvec_out;
     reg [47:0]  from_srl = {48{1'b0}};
     srlvec #(.NBITS(48))
         u_dly(.clk(clk_i),
               .ce(1'b1),
-              .a(4'd10),
+              .a(GD-2),
               .din(data_i),
               .dout(srlvec_out));
     always @(posedge clk_i) begin
