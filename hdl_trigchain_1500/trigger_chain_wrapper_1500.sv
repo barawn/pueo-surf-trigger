@@ -457,6 +457,8 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
     wire [47:0] biquad_out;
     // from the upsampler
     wire [95:0] upsample_out;
+
+    wire [95:0] to_agc;
     
     always @(posedge aclk) begin
         pipe_to_filter <= lpf_out_1500;
