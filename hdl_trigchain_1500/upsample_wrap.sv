@@ -29,8 +29,10 @@ module upsample_wrap(
     always @(posedge clk_i) begin
         from_srl <= srlvec_out;
     end
-    wire [7:0][12:0] lpf_out_tmp;    
-    shannon_whitaker_lpfull_v3
+    wire [7:0][12:0] lpf_out_tmp;
+    // Tell the filter we're upsampling so it can
+    // drop the add input and properly scale.
+    shannon_whitaker_lpfull_v3 #(.UPSAMPLE("TRUE"))
         u_lpf(.clk_i(clk_i),
               .rst_i(1'b0),
               .dat_i(to_filter),
