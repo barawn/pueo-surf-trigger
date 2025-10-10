@@ -42,6 +42,8 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
     localparam AGC_BITS = 5;
     localparam NSAMPS=(TRIGGER_TYPE == "LF") ? 4 : 8;
 
+    localparam USE_V3 = (TRIGGER_TYPE == "V3" || TRIGGER_TYPE == "V31500") ?
+        "TRUE" : "FALSE";
     // our submodules 
    `DEFINE_WB_IF( thresh_ , 13, 32 );
    `DEFINE_WB_IF( generator_ , 13, 32 );
@@ -66,8 +68,9 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
 
 
     // this is the threshold space
+    localparam L1TYPE = (TRIGGER_TYPE == "V31500") ? "V3" : TRIGGER_TYPE;
     L1_trigger_v2 #(.NBEAMS(NBEAMS),
-                    .TRIGGER_TYPE(TRIGGER_TYPE),
+                    .TRIGGER_TYPE(L1TYPE),
                     .WBCLKTYPE(WBCLKTYPE),
                     .CLKTYPE(CLKTYPE),
                     .IFCLKTYPE(IFCLKTYPE))
@@ -131,10 +134,12 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
                         .dat_i(dat_downsample),
                         .dat_o(data_stage_connection));
         end else begin : MIE
+            localparam CHAIN_TYPE = (TRIGGER_TYPE == "V31500") ? "HALF" : "FULL";
             trigger_chain_x8_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
                                    .HDL_FILTER_VERSION("SYSTOLIC"),
                                    .AGC_CONTROL(AGC_CONTROL),
                                    .USE_BIQUADS(USE_BIQUADS),
+                                   .CHAIN_TYPE(CHAIN_TYPE),
                                    .WBCLKTYPE(WBCLKTYPE),.CLKTYPE(CLKTYPE))
                     u_chain(
                         .wb_clk_i(wb_clk_i),
@@ -157,7 +162,7 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
     // is built.
     generator_wrap #(.WBCLKTYPE(WBCLKTYPE),
                      .IFCLKTYPE(IFCLKTYPE),
-                     .USE_V3(TRIGGER_TYPE == "V3" ? "TRUE" : "FALSE"),
+                     .USE_V3(USE_V3),
                      .NBEAMS(NBEAMS))
         u_generator( .wb_clk_i(wb_clk_i),
                      `CONNECT_WBS_IFM( wb_ , generator_ ),
