@@ -10,6 +10,7 @@ module trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
                                   parameter USE_BIQUADS = "FALSE",
                                   parameter HDL_FILTER_VERSION = "DEFAULT",
                                   parameter CLKTYPE = "NONE",
+                                  parameter CHAIN_TYPE = "FULL",
                                   parameter AGC_CONTROL = "FALSE",
                                   parameter WBCLKTYPE = "NONE")(  
         input wb_clk_i,
@@ -110,22 +111,40 @@ module trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
             assign wb_agc_connect_we_o  = wb_agc_we_i;
             assign wb_agc_connect_sel_o = wb_agc_sel_i;
 
-            trigger_chain_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
-                                    .USE_BIQUADS(USE_BIQUADS),
-                                    .HDL_FILTER_VERSION(HDL_FILTER_VERSION),
-                                    .AGC_CONTROL(AGC_CONTROL),
-                                    .WBCLKTYPE(WBCLKTYPE),.CLKTYPE(CLKTYPE))
-            u_chain(
-                .wb_clk_i(wb_clk_i),
-                .wb_rst_i(wb_rst_i),
-                `CONNECT_WBS_IFM( wb_bq_ , wb_bq_connect_ ),
-                `CONNECT_WBS_IFM( wb_agc_controller_ , wb_agc_connect_ ),
-                .reset_i(reset_i),
-                .agc_reset_i(agc_reset_i), 
-                .aclk(aclk),
-                .dat_i(dat_i[idx]),
-                .dat_o(dat_o[idx]));
-            end;
+            if (CHAIN_TYPE == "HALF") begin : H
+                trigger_chain_wrapper_1500 #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
+                                        .USE_BIQUADS(USE_BIQUADS),
+                                        .HDL_FILTER_VERSION(HDL_FILTER_VERSION),
+                                        .AGC_CONTROL(AGC_CONTROL),
+                                        .WBCLKTYPE(WBCLKTYPE),.CLKTYPE(CLKTYPE))
+                u_chain(
+                    .wb_clk_i(wb_clk_i),
+                    .wb_rst_i(wb_rst_i),
+                    `CONNECT_WBS_IFM( wb_bq_ , wb_bq_connect_ ),
+                    `CONNECT_WBS_IFM( wb_agc_controller_ , wb_agc_connect_ ),
+                    .reset_i(reset_i),
+                    .agc_reset_i(agc_reset_i), 
+                    .aclk(aclk),
+                    .dat_i(dat_i[idx]),
+                    .dat_o(dat_o[idx]));            
+            end else begin : F
+                trigger_chain_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
+                                        .USE_BIQUADS(USE_BIQUADS),
+                                        .HDL_FILTER_VERSION(HDL_FILTER_VERSION),
+                                        .AGC_CONTROL(AGC_CONTROL),
+                                        .WBCLKTYPE(WBCLKTYPE),.CLKTYPE(CLKTYPE))
+                u_chain(
+                    .wb_clk_i(wb_clk_i),
+                    .wb_rst_i(wb_rst_i),
+                    `CONNECT_WBS_IFM( wb_bq_ , wb_bq_connect_ ),
+                    `CONNECT_WBS_IFM( wb_agc_controller_ , wb_agc_connect_ ),
+                    .reset_i(reset_i),
+                    .agc_reset_i(agc_reset_i), 
+                    .aclk(aclk),
+                    .dat_i(dat_i[idx]),
+                    .dat_o(dat_o[idx]));
+             end
+        end             
     endgenerate
 
     
