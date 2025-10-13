@@ -265,8 +265,31 @@ module lowampa_matched_filter_v2 #(parameter NBITS=12,
 				 .b_i(18'b1),
                                  .pcin_i( dN1_to_dN2 ),
                                  .p_o(sample_out[i]));                                            
-            //divide by 16
-            assign out_o[(OUTQ_INT+OUTQ_FRAC)*i +: (OUTQ_INT+OUTQ_FRAC)] = sample_out[NSAMPS-i-1][4 +: (OUTQ_INT)];
+            //divide by 16 and saturate
+            // Pipeline the saturation.
+            reg [OUTQ_INT-1:0] corrected_out;
+            // Matched filter saturates at 114*-2048 = -233472 which is 19 bit signed.
+            // We want to clip to 16 bit range. This is just checking that [18:15] are 0000 or 1111.
+            wire is_saturated = (sample_out[NSAMPS-i-1][(OUTQ_INT+4)-1 +: 4] != 4'b0000) &&
+                                (sample_out[NSAMPS-i-1][(OUTQ_INT+4)-1 +: 4] != 4'b1111);                                
+            always @(posedge clk_i) begin : SAT
+                if (is_saturated) begin
+                    // if saturated, grab sign from top bit
+                    corrected_out[OUTQ_INT-1] <= sample_out[NSAMPS-i-1][18];
+                    // and all the others are the opposite of the top bit
+                    corrected_out[0 +: (OUTQ_INT-1)] <= {(OUTQ_INT-1){~sample_out[NSAMPS-i-1]}};
+                end else begin
+                    // otherwise it's the same
+                    corrected_out <= sample_out[NSAMPS-i-1][4 +: OUTQ_INT];
+                end
+            end
+// original was much too big a compare
+//            wire [OUTQ_INT-1:0] corrected_out;
+//            assign corrected_out = (sample_out[NSAMPS-i-1][47]==1)?
+//                                   (sample_out[NSAMPS-i-1][46:(4+OUTQ_INT-1)]=={(46-(4+OUTQ_INT)+2){1'b1}}?sample_out[NSAMPS-i-1][4 +: (OUTQ_INT)]:{1'b1,{(OUTQ_INT-1){1'b0}}}):
+//                                   (sample_out[NSAMPS-i-1][46:(4+OUTQ_INT-1)]=={(46-(4+OUTQ_INT)+2){1'b0}}?sample_out[NSAMPS-i-1][4 +: (OUTQ_INT)]:{1'b0,{(OUTQ_INT-1){1'b1}}});
+            
+            assign out_o[(OUTQ_INT+OUTQ_FRAC)*i +: (OUTQ_INT+OUTQ_FRAC)] = corrected_out;
         end
     endgenerate
     
