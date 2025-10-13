@@ -273,14 +273,14 @@ module lowampa_matched_filter_v2 #(parameter NBITS=12,
             wire is_saturated = (sample_out[NSAMPS-i-1][(OUTQ_INT+4)-1 +: 4] != 4'b0000) &&
                                 (sample_out[NSAMPS-i-1][(OUTQ_INT+4)-1 +: 4] != 4'b1111);                                
             always @(posedge clk_i) begin : SAT
-                if (is_saturated) begin
-                    // if saturated, grab sign from top bit
-                    corrected_out[OUTQ_INT-1] <= sample_out[NSAMPS-i-1][18];
-                    // and all the others are the opposite of the top bit
-                    corrected_out[0 +: (OUTQ_INT-1)] <= {(OUTQ_INT-1){~sample_out[NSAMPS-i-1]}};
+                // oops, forgot the sleaze: you don't need to qualify the top bit at all, it always retains sign.
+                corrected_out[OUTQ_INT] <= sample_out[NSAMPS-i-1][18];
+                // if we are saturated, the low bits are the opposite of the sign bit.
+                // otherwise we just grab them.
+                if (is_saturated) begin                    
+                    corrected_out[0 +: (OUTQ_INT-1)] <= {(OUTQ_INT-1){~sample_out[NSAMPS-i-1][18]}};
                 end else begin
-                    // otherwise it's the same
-                    corrected_out <= sample_out[NSAMPS-i-1][4 +: OUTQ_INT];
+                    corrected_out[0 +: (OUTQ_INT-1)] <= sample_out[NSAMPS-i-1][4 +: OUTQ_INT];
                 end
             end
 // original was much too big a compare
