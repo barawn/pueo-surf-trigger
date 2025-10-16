@@ -74,7 +74,7 @@ module dual_pueo_beam_lowampa_v2
                    .sq_outA_o(squareA),
                    .sq_outB_o(squareB));
 
-    dual_pueo_lowampa_envelope_v2b
+    dual_pueo_lowampa_envelope_v2c
         u_envelope(.clk_i(clk_i),
                    .squareA_i(squareA),
                    .squareB_i(squareB),
