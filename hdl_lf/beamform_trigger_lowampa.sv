@@ -23,7 +23,7 @@ module beamform_trigger_lowampa #(  parameter NBEAMS = 2,
         input [1:0] thresh_wr_i,
         input [1:0] thresh_update_i,        
         
-        output [NBEAMS-1:0] trigger_o
+        output [2*NBEAMS-1:0] trigger_o
     );
 
     // Moving these to localparams, since this module will break with unexpected values.
