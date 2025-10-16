@@ -4,16 +4,17 @@
 // Two biquads in serial, with coefficients loaded in by wishbone interface
 // TODO Make Fixed point parameterizable
 module biquad8_x2_wrapper #(parameter WBCLKTYPE="NONE",
-                            parameter CLKTYPE="NONE")(
+                            parameter CLKTYPE="NONE",
+                            parameter NSAMP=8)(
         input wb_clk_i,
         input wb_rst_i,
                                                     // Using [7:2] of address space
         `TARGET_NAMED_PORTS_WB_IF( wb_ , 8, 32 ),  // Address width, data width    
         input reset_BQ_i,
         input aclk,
-        input [95:0] dat_i,
+        input [12*NSAMP-1:0] dat_i,
         
-        output [95:0] dat_o
+        output [12*NSAMP-1:0] dat_o
     );
 
     // // UNPACK is 128 -> 96
@@ -62,13 +63,13 @@ module biquad8_x2_wrapper #(parameter WBCLKTYPE="NONE",
     
 
     // these are the outputs
-    wire [95:0] bq_out[1:0];
+    wire [12*NSAMP-1:0] bq_out[1:0];
     assign dat_o = bq_out[1];
     
     
     biquad8_wrapper #(.NBITS(12),
                       .NFRAC(0),
-                      .NSAMP(8),
+                      .NSAMP(NSAMP),
                       .OUTBITS(12),
                       .OUTFRAC(0),
                       .WBCLKTYPE(WBCLKTYPE),
@@ -84,7 +85,7 @@ module biquad8_x2_wrapper #(parameter WBCLKTYPE="NONE",
 
     biquad8_wrapper #(.NBITS(12),
                       .NFRAC(0),
-                      .NSAMP(8),
+                      .NSAMP(NSAMP),
                       .OUTBITS(12),
                       .OUTFRAC(0),
                       .WBCLKTYPE(WBCLKTYPE),
