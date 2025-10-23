@@ -40,6 +40,7 @@ module matched_filter_v3_1500 #(parameter INBITS=12,
             // max is 4*4095 + 4096 + 2048 = 20680 which is 14.33 bits, needs INBITS+4
             reg signed [(INBITS+4)-1:0] lowsumA = {(INBITS+4){1'b0}};
             // and next is z^-12 - z^-13 + 2z^-14 + 2z^-15 which maxes at 12280 = 15 bits
+            // no this is -2z^-14
             reg signed [(INBITS+3)-1:0] lowsumB = {(INBITS+3){1'b0}};
             // high DSP gets z^-7 + (1-z^-1)z^-8 + (1-z^-1)z^-10
             // maxes at 10238 = 15 bits
@@ -79,9 +80,9 @@ module matched_filter_v3_1500 #(parameter INBITS=12,
             wire [12:0] lowsumB_0 = preadd[i];
             wire [11:0] lowsumB_1 = (i>1) ? store[i-2] : sstore[i+2];
             wire [11:0] lowsumB_2 = (i>2) ? store[i-3] : sstore[i+1];
-            wire [14:0] lowsumB_0_SE = { {2{lowsumB_0[12]}}, lowsumB_0 };
-            wire [14:0] lowsumB_1_SE = { {2{lowsumB_1[11]}}, lowsumB_1, 1'b0 };
-            wire [14:0] lowsumB_2_SE = { {2{lowsumB_2[11]}}, lowsumB_2, 1'b0 };
+            wire [14:0] lowsumB_0_SE = { {2{lowsumB_0[12]}}, lowsumB_0 };       // preadd
+            wire [14:0] lowsumB_1_SE = { {2{lowsumB_1[11]}}, lowsumB_1, 1'b0 };// -2x[i-2]
+            wire [14:0] lowsumB_2_SE = { {2{lowsumB_2[11]}}, lowsumB_2, 1'b0 };// +2x[i-3]
                                     
             // highsumA is 15 bits
             wire [12:0] highsumA_0 = preadd[i];
@@ -115,9 +116,9 @@ module matched_filter_v3_1500 #(parameter INBITS=12,
                 // lowsumA is 16 bits.
                 // sstore[i] - 4*preadd[i-1] - 2*store[i-3]
                 lowsumA <= lowsumA_0_SE - lowsumA_1_SE - lowsumA_2_SE;
-                // preadd[i] + 2store[i-2] + 2store[i-3]
+                // preadd[i] - 2store[i-2] + 2store[i-3]
                 // sigh. lowsumB is 15 bits
-                lowsumB <= lowsumB_0_SE + lowsumB_1_SE + lowsumB_2_SE;
+                lowsumB <= lowsumB_0_SE - lowsumB_1_SE + lowsumB_2_SE;
                 
                 // preadd[i] + din[i-3] - preadd[i-2]
                 // highsumA is 15 bits                       
