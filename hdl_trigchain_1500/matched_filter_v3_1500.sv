@@ -9,7 +9,7 @@ module matched_filter_v3_1500 #(parameter INBITS=12,
     
     wire signed [NSAMPS-1:0][INBITS-1:0] din;
     // Start off by generating the preadd.
-    reg signed [NSAMPS-1:0][INBITS:0] preadd = { NSAMPS*(INBITS+1){1'b0}};
+    reg [NSAMPS-1:0][INBITS:0] preadd = { NSAMPS*(INBITS+1){1'b0}};
     // Preadd needs a store to wrap around.
     reg signed [NSAMPS-1:0][INBITS:0] preadd_store = { NSAMPS*(INBITS+1){1'b0}};
     // The preadd is obviously delayed by 1 clock due to the add, so we need to
@@ -104,7 +104,9 @@ module matched_filter_v3_1500 #(parameter INBITS=12,
                 store[i] <= din[i];
                 sstore[i] <= store[i];
                 // preadd is 1+z^-1
-                preadd[i] <= din[i] - ((i > 0) ? din[i-1] : store[i+3]);
+                preadd[i] <= {din[i][11],din[i]} - ((i > 0) ? 
+                        {din[i-1][11],din[i-1]} : 
+                        {store[i+3][11], store[i+3]});
                 preadd_store[i] <= preadd[i];
                 
                 // Sign extension seems to act weird for some reason here.
