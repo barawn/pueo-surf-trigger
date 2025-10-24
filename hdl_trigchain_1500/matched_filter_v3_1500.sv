@@ -83,6 +83,10 @@ module matched_filter_v3_1500 #(parameter INBITS=12,
             wire [14:0] lowsumB_0_SE = { {2{lowsumB_0[12]}}, lowsumB_0 };       // preadd
             wire [14:0] lowsumB_1_SE = { {2{lowsumB_1[11]}}, lowsumB_1, 1'b0 };// -2x[i-2]
             wire [14:0] lowsumB_2_SE = { {2{lowsumB_2[11]}}, lowsumB_2, 1'b0 };// +2x[i-3]
+
+            // lowsum is 17 bits. The rounding term also goes here but it obviously doesn't matter
+            wire [16:0] lowsum_0_SE = { {2{lowsumB_store[14]}}, lowsumB_store };
+            wire [16:0] lowsum_1_SE = { lowsumA_store2[15], lowsumA_store };
                                     
             // highsumA is 15 bits
             wire [12:0] highsumA_0 = preadd[i];
@@ -100,6 +104,7 @@ module matched_filter_v3_1500 #(parameter INBITS=12,
             wire [13:0] highsumB_1_SE = { {2{highsumB_1[11]}}, highsumB_1 };
             wire [13:0] highsumB_2_SE = { {2{highsumB_2[11]}}, highsumB_2 };
             
+            wire not_halfway = |highsum[3:0];
                        
             always @(posedge aclk) begin : P
                 store[i] <= din[i];
@@ -129,15 +134,19 @@ module matched_filter_v3_1500 #(parameter INBITS=12,
                 lowsumA_store <= lowsumA;
                 lowsumA_store2 <= lowsumA_store;
                 lowsumB_store <= lowsumB;
-                lowsum <= lowsumB_store + lowsumA_store2;
+                // add the round constant here
+                lowsum <= lowsum_0_SE + lowsum_1_SE + 8;
                 highsumA_store <= highsumA;
                 
                 highsum <= highsumA_store + highsumB + lowsum;
+
+                // saturation and symmetric rounding.
                 if (^highsum[(INBITS+4-1) +: 2]) begin
                     highsum_sat[INBITS-1] <= highsum[INBITS+5-1];
                     highsum_sat[0 +: (INBITS-1)] <= {(INBITS-1){highsum[INBITS+4-1]}};
                 end else begin
-                    highsum_sat <= highsum[4 +: INBITS];
+                    highsum_sat[1 +: (INBITS-1)] <= highsum[5 +: (INBITS-1)];
+                    highsum_sat[0] = highsum_sat[0] && not_halfway;
                 end
             end
             assign data_o[INBITS*i +: INBITS] = highsum_sat;
