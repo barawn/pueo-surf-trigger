@@ -86,7 +86,7 @@ module matched_filter_v3_1500 #(parameter INBITS=12,
 
             // lowsum is 17 bits. The rounding term also goes here but it obviously doesn't matter
             wire [16:0] lowsum_0_SE = { {2{lowsumB_store[14]}}, lowsumB_store };
-            wire [16:0] lowsum_1_SE = { lowsumA_store2[15], lowsumA_store };
+            wire [16:0] lowsum_1_SE = { lowsumA_store2[15], lowsumA_store2 };
                                     
             // highsumA is 15 bits
             wire [12:0] highsumA_0 = preadd[i];
