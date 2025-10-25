@@ -5,7 +5,8 @@
 // TODO Make Fixed point parameterizable
 module biquad8_x2_wrapper #(parameter WBCLKTYPE="NONE",
                             parameter CLKTYPE="NONE",
-                            parameter NSAMP=8)(
+                            parameter NSAMP=8,
+                            parameter VERSION=2)(
         input wb_clk_i,
         input wb_rst_i,
                                                     // Using [7:2] of address space
@@ -66,37 +67,71 @@ module biquad8_x2_wrapper #(parameter WBCLKTYPE="NONE",
     wire [12*NSAMP-1:0] bq_out[1:0];
     assign dat_o = bq_out[1];
     
-    
-    biquad8_wrapper #(.NBITS(12),
-                      .NFRAC(0),
-                      .NSAMP(NSAMP),
-                      .OUTBITS(12),
-                      .OUTFRAC(0),
-                      .WBCLKTYPE(WBCLKTYPE),
-                      .CLKTYPE(CLKTYPE))
-        u_biquad8_A(.wb_clk_i(wb_clk_i),
-                  .wb_rst_i(1'b0),
-                  `CONNECT_WBS_IFM( wb_ , bq0_ ),
-                  .clk_i(aclk),
-                  .rst_i(reset_BQ_i),
-                  .global_update_i(1'b0),
-                  .dat_i(dat_i),
-                  .dat_o(bq_out[0]));   
-
-    biquad8_wrapper #(.NBITS(12),
-                      .NFRAC(0),
-                      .NSAMP(NSAMP),
-                      .OUTBITS(12),
-                      .OUTFRAC(0),
-                      .WBCLKTYPE(WBCLKTYPE),
-                      .CLKTYPE(CLKTYPE))
-        u_biquad8_B(.wb_clk_i(wb_clk_i),
-                  .wb_rst_i(1'b0),
-                  `CONNECT_WBS_IFM( wb_ , bq1_ ),
-                  .clk_i(aclk),
-                  .rst_i(reset_BQ_i),
-                  .global_update_i(1'b0),
-                  .dat_i(bq_out[0]),
-                  .dat_o(bq_out[1]));   
-
+    generate
+        if (VERSION == 2) begin : V2
+            biquad8_wrapper_v2 #(.NBITS(12),
+                              .NFRAC(0),
+                              .NSAMP(NSAMP),
+                              .OUTBITS(12),
+                              .OUTFRAC(0),
+                              .WBCLKTYPE(WBCLKTYPE),
+                              .CLKTYPE(CLKTYPE))
+                u_biquad8_A(.wb_clk_i(wb_clk_i),
+                          .wb_rst_i(1'b0),
+                          `CONNECT_WBS_IFM( wb_ , bq0_ ),
+                          .clk_i(aclk),
+                          .rst_i(reset_BQ_i),
+                          .global_update_i(1'b0),
+                          .dat_i(dat_i),
+                          .dat_o(bq_out[0]));   
+        
+            biquad8_wrapper_v2 #(.NBITS(12),
+                              .NFRAC(0),
+                              .NSAMP(NSAMP),
+                              .OUTBITS(12),
+                              .OUTFRAC(0),
+                              .WBCLKTYPE(WBCLKTYPE),
+                              .CLKTYPE(CLKTYPE))
+                u_biquad8_B(.wb_clk_i(wb_clk_i),
+                          .wb_rst_i(1'b0),
+                          `CONNECT_WBS_IFM( wb_ , bq1_ ),
+                          .clk_i(aclk),
+                          .rst_i(reset_BQ_i),
+                          .global_update_i(1'b0),
+                          .dat_i(bq_out[0]),
+                          .dat_o(bq_out[1]));   
+        end else begin : V1
+            biquad8_wrapper #(.NBITS(12),
+                              .NFRAC(0),
+                              .NSAMP(NSAMP),
+                              .OUTBITS(12),
+                              .OUTFRAC(0),
+                              .WBCLKTYPE(WBCLKTYPE),
+                              .CLKTYPE(CLKTYPE))
+                u_biquad8_A(.wb_clk_i(wb_clk_i),
+                          .wb_rst_i(1'b0),
+                          `CONNECT_WBS_IFM( wb_ , bq0_ ),
+                          .clk_i(aclk),
+                          .rst_i(reset_BQ_i),
+                          .global_update_i(1'b0),
+                          .dat_i(dat_i),
+                          .dat_o(bq_out[0]));   
+        
+            biquad8_wrapper #(.NBITS(12),
+                              .NFRAC(0),
+                              .NSAMP(NSAMP),
+                              .OUTBITS(12),
+                              .OUTFRAC(0),
+                              .WBCLKTYPE(WBCLKTYPE),
+                              .CLKTYPE(CLKTYPE))
+                u_biquad8_B(.wb_clk_i(wb_clk_i),
+                          .wb_rst_i(1'b0),
+                          `CONNECT_WBS_IFM( wb_ , bq1_ ),
+                          .clk_i(aclk),
+                          .rst_i(reset_BQ_i),
+                          .global_update_i(1'b0),
+                          .dat_i(bq_out[0]),
+                          .dat_o(bq_out[1]));           
+        end
+    endgenerate        
 endmodule
