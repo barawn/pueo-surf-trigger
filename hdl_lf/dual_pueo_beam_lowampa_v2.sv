@@ -47,7 +47,7 @@ module dual_pueo_beam_lowampa_v2
         
         input [47:0] thresh_casc_i,     //! only used if CASCADE is true
         output [47:0] thresh_casc_o,
-        output [223:0] debug_envelope
+        output [255:0] debug_envelope
     );
 
     wire [NSAMP-1:0][13:0] squareA;     //! 8 samples of the squared beam for beam A

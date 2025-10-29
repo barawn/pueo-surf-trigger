@@ -433,7 +433,7 @@ module lowampa_trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS =
         pipe_to_biquad <= match_out;        
     end 
     
-    assign dat_debug[0] = {{7{dat_o[19]}},dat_o[19:15],{7{dat_o[14]}},dat_o[14:10],{7{dat_o[9]}},dat_o[9:5],{7{dat_o[4]}},dat_o[4:0]};
+    assign dat_debug[0] = pipe_to_filter;
     assign dat_debug[1] = pipe_to_biquad;
 
     // Low pass filter
@@ -458,7 +458,7 @@ module lowampa_trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS =
     endgenerate
     
     // Matched Filter
-    lowampa_matched_filter_v2 u_matched_filter(
+    lowampa_matched_filter_v3 u_matched_filter(
         .clk_i(aclk),
         .in_i(pipe_to_filter),
         .out_o(match_out)
