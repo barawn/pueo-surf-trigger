@@ -24,6 +24,26 @@ module dual_pueo_beam_lowampa_v2
                       #(parameter INTYPE = "RAW",           // either RAW or POSTADD.
                         parameter CASCADE = "TRUE",         // first is false, everyone else is true
                         parameter DEBUG = "FALSE",
+                        parameter ABEAMNO=0,
+                        parameter ABEAMNEG=0,
+                        parameter BBEAMNO=1,
+                        parameter BBEAMNEG=0,
+                        parameter CBEAMNO=2,
+                        parameter CBEAMNEG=0,
+                        parameter DBEAMNO=3,
+                        parameter DBEAMNEG=0,
+                        parameter EBEAMNO=4,
+                        parameter EBEAMNEG=0,
+                        parameter ABEAMNO2=0,
+                        parameter ABEAMNEG2=0,
+                        parameter BBEAMNO2=1,
+                        parameter BBEAMNEG2=0,
+                        parameter CBEAMNO2=2,
+                        parameter CBEAMNEG2=0,
+                        parameter DBEAMNO2=3,
+                        parameter DBEAMNEG2=0,
+                        parameter EBEAMNO2=4,
+                        parameter EBEAMNEG2=0,
                         // thank you, SystemVerilog 2009
                         localparam NBITS=5,
                         localparam NSAMP=4,
@@ -60,20 +80,54 @@ module dual_pueo_beam_lowampa_v2
     wire [17:0] envelopeB; //! Formed envelope for beam B
     
     //assign debug_envelope = {{2{squareA[3][13]}},squareA[3],{2{squareA[2][13]}},squareA[2],{2{squareA[1][13]}},squareA[1],{2{squareA[0][13]}},squareA[0],dbgA};
-    assign debug_envelope = {envelopeB[16:1],envelopeA[16:1],{2{squareA[3][13]}},squareA[3],{2{squareA[2][13]}},squareA[2],{2{squareA[1][13]}},squareA[1],{2{squareA[0][13]}},squareA[0],dbgA}; 
+    //assign debug_envelope = {envelopeB[16:1],envelopeA[16:1],{2{squareA[3][13]}},squareA[3],{2{squareA[2][13]}},squareA[2],{2{squareA[1][13]}},squareA[1],{2{squareA[0][13]}},squareA[0],dbgA}; 
     
-    dual_pueo_beamform_lowampa_v2 #(.INTYPE(INTYPE))
-        u_beamform(.clk_i(clk_i),
-                   .beamA_i(beamA_i),
-                   .beamA_use(beamA_use),
-                   .beamA_invert(beamA_invert),
-                   .beamB_i(beamB_i),
-                   .beamB_use(beamB_use),
-                   .beamB_invert(beamB_invert),
-                   .outA_o(dbgA),
-                   .outB_o(dbgB),
-                   .sq_outA_o(squareA),
-                   .sq_outB_o(squareB));
+//    dual_pueo_beamform_lowampa_v2 #(.INTYPE(INTYPE))
+//        u_beamform(.clk_i(clk_i),
+//                   .beamA_i(beamA_i),
+//                   .beamA_use(beamA_use),
+//                   .beamA_invert(beamA_invert),
+//                   .beamB_i(beamB_i),
+//                   .beamB_use(beamB_use),
+//                   .beamB_invert(beamB_invert),
+//                   .outA_o(dbgA),
+//                   .outB_o(dbgB),
+//                   .sq_outA_o(squareA),
+//                   .sq_outB_o(squareB));
+
+    wire [NSAMP*NBITS-1:0] beamA_vec[NCHAN-1:0];
+    wire [NSAMP*NBITS-1:0] beamB_vec[NCHAN-1:0];
+        generate
+        genvar ii;
+          for (ii=0;ii<NCHAN;ii=ii+1) begin : CV
+                    // channels jump by NSAMP*NBITS. also flip to offset binary
+                    assign beamA_vec[ii] = beamA_i[NBITS*NSAMP*ii +: NBITS*NSAMP];
+                    assign beamB_vec[ii] = beamB_i[NBITS*NSAMP*ii +: NBITS*NSAMP];
+           
+          end
+         endgenerate
+         
+   localparam [4:0] inversionA = {(EBEAMNEG==0)?(1'b0):(1'b1),(DBEAMNEG==0)?(1'b0):(1'b1),(CBEAMNEG==0)?(1'b0):(1'b1),(BBEAMNEG==0)?(1'b0):(1'b1),(ABEAMNEG==0)?(1'b0):(1'b1)};
+   localparam [4:0] inversionB = {(EBEAMNEG2==0)?(1'b0):(1'b1),(DBEAMNEG2==0)?(1'b0):(1'b1),(CBEAMNEG2==0)?(1'b0):(1'b1),(BBEAMNEG2==0)?(1'b0):(1'b1),(ABEAMNEG2==0)?(1'b0):(1'b1)};
+   beamform_lowampa#(.INVERSION(inversionA))//.INTYPE(INTYPE))
+        u_beamformA(.clk_i(clk_i),
+        .A(beamA_vec[ABEAMNO]),
+        .B(beamA_vec[BBEAMNO]),
+        .C(beamA_vec[CBEAMNO]),
+        .D(beamA_vec[DBEAMNO]),
+        .E(beamA_vec[EBEAMNO]),
+        .O(squareA)
+        );
+   beamform_lowampa#(.INVERSION(inversionB))//.INTYPE(INTYPE))
+        u_beamformB(.clk_i(clk_i),
+        .A(beamA_vec[ABEAMNO2]),
+        .B(beamA_vec[BBEAMNO2]),
+        .C(beamA_vec[CBEAMNO2]),
+        .D(beamA_vec[DBEAMNO2]),
+        .E(beamA_vec[EBEAMNO2]),
+        .O(squareB)
+        );
+    
 
     dual_pueo_lowampa_envelope_v2b
         u_envelope(.clk_i(clk_i),

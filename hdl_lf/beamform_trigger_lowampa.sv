@@ -41,12 +41,9 @@ module beamform_trigger_lowampa #(  parameter NBEAMS = 2,
 
     // NOTE THE BIG-ENDIAN ARRAYS HERE
     localparam int delay_array [0:(`BEAM_TOTAL)-1][0:NCHAN-1] = `BEAM_ANTENNA_DELAYS;
-    localparam bit [NCHAN-1:0] beam_use_array_flipped [0:(`BEAM_TOTAL)-1] = `BEAM_USED_CHANNELS;
-    localparam bit [NCHAN-1:0] beam_inv_array_flipped [0:(`BEAM_TOTAL)-1] = `BEAM_CHANNEL_INVERSION;
+    localparam int beam_use_array [0:(`BEAM_TOTAL)-1][5-1:0]  = `BEAM_USED_CHANNELS;
+    localparam int beam_inv_array [0:(`BEAM_TOTAL)-1][5-1:0]  = `BEAM_CHANNEL_INVERSION;
 
-    wire [NCHAN-1:0] beam_use_array [0:(`BEAM_TOTAL)-1];// = `BEAM_USED_CHANNELS;
-    wire [NCHAN-1:0] beam_inv_array [0:(`BEAM_TOTAL)-1];// = `BEAM_CHANNEL_INVERSION;
-    
     reg  [SAMPLE_STORE_DEPTH*NSAMP*NBITS-1:0] sample_store [NCHAN-1:0];
     wire [NCHAN-1:0][NSAMP*NBITS-1:0] beams_delayed [NBEAMS-1:0];
     wire [NSAMP-1:0][NBITS-1:0] vectorized_delayed_data [NBEAMS-1:0][NCHAN-1:0];
@@ -61,8 +58,6 @@ module beamform_trigger_lowampa #(  parameter NBEAMS = 2,
         // Vectorize for debugging
         for(beam_idx=0; beam_idx<NBEAMS; beam_idx++) begin : VB
             for(chan_idx=0; chan_idx<NCHAN; chan_idx++) begin : VC
-                assign beam_use_array[beam_idx][chan_idx] = beam_use_array_flipped[beam_idx][NCHAN-1-chan_idx]; 
-                assign beam_inv_array[beam_idx][chan_idx] = beam_inv_array_flipped[beam_idx][NCHAN-1-chan_idx]; 
                 for(samp_idx=0; samp_idx<NSAMP; samp_idx++) begin : VS
                     assign vectorized_delayed_data[beam_idx][chan_idx][samp_idx] = beams_delayed[beam_idx][chan_idx][samp_idx*NBITS +: NBITS];
                 end
@@ -84,15 +79,31 @@ module beamform_trigger_lowampa #(  parameter NBEAMS = 2,
                 wire [255:0] debug_envelope_temp;
                 dual_pueo_beam_lowampa_v2 #(.INTYPE("RAW"),
                                     .DEBUG(DEBUG),
-                                    .CASCADE(beam_idx == 0 ? "FALSE" : "TRUE"))
+                                    .CASCADE(beam_idx == 0 ? "FALSE" : "TRUE"),
+                        .ABEAMNO(beam_use_array[beam_idx][0]),
+                        .ABEAMNEG(beam_inv_array[beam_idx][0]),
+                        .BBEAMNO(beam_use_array[beam_idx][1]),
+                        .BBEAMNEG(beam_inv_array[beam_idx][1]),
+                        .CBEAMNO(beam_use_array[beam_idx][2]),
+                        .CBEAMNEG(beam_inv_array[beam_idx][2]),
+                        .DBEAMNO(beam_use_array[beam_idx][3]),
+                        .DBEAMNEG(beam_inv_array[beam_idx][3]),
+                        .EBEAMNO(beam_use_array[beam_idx][4]),
+                        .EBEAMNEG(beam_inv_array[beam_idx][4]),
+                        .ABEAMNO2(beam_use_array[beam_idx+1][0]),
+                        .ABEAMNEG2(beam_inv_array[beam_idx+1][0]),
+                        .BBEAMNO2(beam_use_array[beam_idx+1][1]),
+                        .BBEAMNEG2(beam_inv_array[beam_idx+1][1]),
+                        .CBEAMNO2(beam_use_array[beam_idx+1][2]),
+                        .CBEAMNEG2(beam_inv_array[beam_idx+1][2]),
+                        .DBEAMNO2(beam_use_array[beam_idx+1][3]),
+                        .DBEAMNEG2(beam_inv_array[beam_idx+1][3]),
+                        .EBEAMNO2(beam_use_array[beam_idx+1][4]),
+                        .EBEAMNEG2(beam_inv_array[beam_idx+1][4]))
                  u_beamform(.clk_i(clk_i),
                             .rst_i(rst_i),
                             .beamA_i(beams_delayed[beam_idx + 0]), // Beam A corresponds to the MSB of the trigger bits
-                            .beamA_use(beam_use_array[beam_idx+0]),
-                            .beamA_invert(beam_inv_array[beam_idx+0]),
                             .beamB_i(beams_delayed[beam_idx + 1]),
-                            .beamB_use(beam_use_array[beam_idx+1]),
-                            .beamB_invert(beam_inv_array[beam_idx+1]),
                             .thresh_i(thresh_i),
                             .thresh_wr_i(thresh_wr_i),
                             .thresh_update_i(thresh_update_i),        
