@@ -167,13 +167,13 @@ module beamform_lowampa #(parameter [5:0] ADD_CONSTANT = 6'd50,
                 localparam [31:0] D63 = lut_recalculate(D63_INIT, INVERSION);
                 
                 LUT6_2 #(.INIT({C63, S63}))
-                     u_cs_lut(.I5(1'b1),.I4(E[i]),.I3(D[i]),
-                              .I2(C[i]),.I1(B[i]),.I0(A[i]),
+                    u_cs_lut(.I5(1'b1),.I4(addends[4][i]),.I3(addends[3][i]),
+                             .I2(addends[2][i]),.I1(addends[1][i]),.I0(addends[0][i]),
                               .O5(s_to_ff[i]),
                               .O6(c_to_ff[i]));
                 LUT5 #(.INIT(D63))
-                    u_d_lut(.I4(E[i]),.I3(D[i]),.I2(C[i]),
-                             .I1(B[i]),.I0(A[i]),
+                    u_d_lut(.I4(addends[4][i]),.I3(addends[3][i]),
+                             .I2(addends[2][i]),.I1(addends[1][i]),.I0(addends[0][i]),
                              .O(d_to_ff[i]));
                 always @(posedge clk_i) begin
                     s_ff[i] <= s_to_ff[i];
