@@ -468,11 +468,19 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
     // Low pass filter
     generate
         wire [7:0][12:0] lpf_out_tmp;
-        shannon_whitaker_lpfull_v3
-            u_lpf( .clk_i(aclk),
-                   .rst_i(1'b0),
-                   .dat_i(dat_i),
-                   .dat_o(lpf_out_tmp));
+        if (HDL_FILTER_VERSION == "V4") begin : V4
+            shannon_whitaker_lpfull_v4
+                u_lpf( .clk_i(aclk),
+                       .rst_i(1'b0),
+                       .dat_i(dat_i),
+                       .dat_o(lpf_out_tmp));
+        end else begin : V3
+            shannon_whitaker_lpfull_v3
+                u_lpf( .clk_i(aclk),
+                       .rst_i(1'b0),
+                       .dat_i(dat_i),
+                       .dat_o(lpf_out_tmp));
+        end
         genvar ii;
         for (ii=0;ii<8;ii=ii+1) begin : LP
             assign lpf_out[12*ii +: 12] = lpf_out_tmp[ii][11:0];
@@ -505,7 +513,8 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                 .dat_o(biquad_out)
             );
 
-            upsample_wrap u_upsample(.clk_i(aclk),
+            upsample_wrap #(.FILTER_VERSION(HDL_FILTER_VERSION == "V4" ? 4 : 3))
+                          u_upsample(.clk_i(aclk),
                                      .data_i(biquad_out),
                                      .data_o(upsample_out));
 
@@ -516,7 +525,9 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
             // get from a biquad with unity gain
             assign biquad_out = pipe_to_biquad;
 
-            upsample_wrap u_upsample(.clk_i(aclk),
+
+            upsample_wrap #(.FILTER_VERSION(HDL_FILTER_VERSION == "V4" ? 4 : 3))
+                          u_upsample(.clk_i(aclk),
                                      .data_i(biquad_out),
                                      .data_o(upsample_out));
 

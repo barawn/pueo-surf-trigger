@@ -1,13 +1,13 @@
 `timescale 1ns / 1ps
 // Wrap for upsampling using the filter.
-module upsample_wrap(
+module upsample_wrap #(parameter FILTER_VERSION = 3)(
         input clk_i,
         input [47:0] data_i,
         output [95:0] data_o
     );
     
     // group delay of the filter. 
-    localparam GD = 14;
+    localparam GD = (FILTER_VERSION == 4) ? 10 : 14;
     
     wire [95:0] to_filter = {
         {12{1'b0}},
@@ -35,11 +35,22 @@ module upsample_wrap(
     wire [7:0][12:0] lpf_out_tmp;
     // Tell the filter we're upsampling so it can
     // drop the add input and properly scale.
-    shannon_whitaker_lpfull_v3 #(.UPSAMPLE("TRUE"))
-        u_lpf(.clk_i(clk_i),
-              .rst_i(1'b0),
-              .dat_i(to_filter),
-              .dat_o(lpf_out_tmp));
+    generate
+        if (FILTER_VERSION == 4) begin : V4
+            shannon_whitaker_lpfull_v4 #(.UPSAMPLE("TRUE"))
+                u_lpf(.clk_i(clk_i),
+                      .rst_i(1'b0),
+                      .dat_i(to_filter),
+                      .dat_o(lpf_out_tmp));
+        end else begin : V3
+            shannon_whitaker_lpfull_v3 #(.UPSAMPLE("TRUE"))
+                u_lpf(.clk_i(clk_i),
+                      .rst_i(1'b0),
+                      .dat_i(to_filter),
+                      .dat_o(lpf_out_tmp));
+        end
+    endgenerate
+    
     assign from_filter = {
         lpf_out_tmp[7][11:0],
         lpf_out_tmp[6][11:0],
