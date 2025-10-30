@@ -140,7 +140,7 @@ module lowampa_matched_filter_v3 #(parameter NBITS=12,
         begin
 	    //comment is maximum size relative to input maximum
 	    //add negatives before inverting where resonable
-            sumn1 <= delay_x_array[4+i] + {delay_x_array[5+i],2'b0}; //-5, 76 and 75 after 18 delays
+            sumn1 <= delay_x_array[4+i] + {delay_x_array[5+i],2'b0}; //-5, 76 and 77 after 18 delays
 	        sumn2 <= sumn1 + {delay_x_array[4+i],1'b0}; //-7, 72 after 17 delays
     	    sumn3 <= delay_x_array[2+i] + {delay_y_array[2+i],1'b0}; //-9, 70 after 17 delays
     	    sumn4 <=sumn3+{sumn2[NBITS+2],sumn2}; //-16
@@ -157,7 +157,7 @@ module lowampa_matched_filter_v3 #(parameter NBITS=12,
     	    sumn9del4 <= sumn9del3; //-12
     	    sumn10 <= delay_y_array[2+i] + delay_y_array[0+i]; // -4+-4=-8, 34 and 32 after 8 delays
             sumn11 <= {sumn10[NBITS+2],sumn10} + delay_y_array[2+i]; // -8+-4=-12, 30 after 7 delays
-    	    sumn12 <= {sumn11[NBITS+3],sumn11} + {sumn9del3[NBITS+3],sumn9del3}; //-24
+    	    sumn12 <= {sumn11[NBITS+3],sumn11} + {sumn9del4[NBITS+3],sumn9del4}; //-24
 
 	        sumn13 <= delay_y_array[1+i] + delay_y_array[5+i]; //-4+-4=-8, 9 and 13 after 2 delays
 
