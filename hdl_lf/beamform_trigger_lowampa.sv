@@ -29,7 +29,7 @@ module beamform_trigger_lowampa #(  parameter NBEAMS = 2,
     );
 
     // Moving these to localparams, since this module will break with unexpected values.
-    localparam SAMPLE_STORE_DEPTH = 2*(8+1); // The +2 is for aligning antenna 0 to the same place every time, even with a "negative delay"
+  localparam SAMPLE_STORE_DEPTH = 2*(7)+1; // The +2 is for aligning antenna 0 to the same place every time, even with a "negative delay"
 
 //    generate
 //        if(`MAX_ANTENNA_DELAY_0 > 8) begin: THROW_AN_ERROR
@@ -73,7 +73,7 @@ module beamform_trigger_lowampa #(  parameter NBEAMS = 2,
             for(chan_idx=0; chan_idx<NCHAN; chan_idx++) begin : CH
                 // The first term below makes sure that antenna 0 always has a delay of 8. 
                 // If another antenna has a delay of 0, as long as antenna 0 has a max delay < 8 all should be good.
-                int sample_delay = (SAMPLE_STORE_DEPTH-2)*(NSAMP) - ((64 - delay_array[beam_idx][5]) + delay_array[beam_idx][chan_idx]);
+              int sample_delay = (SAMPLE_STORE_DEPTH-1)*(NSAMP) - ((52 - delay_array[beam_idx][5]) + delay_array[beam_idx][chan_idx]);
                 assign beams_delayed[beam_idx][chan_idx] = sample_store[chan_idx][( sample_delay )*NBITS +: NSAMP*NBITS];
             end
         end
