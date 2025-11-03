@@ -233,13 +233,11 @@ module surf_trig_gen_v3 #(parameter NBEAMS=48,
     
     // now just buffer it and send it out
     // Metadata is currently the bottom 8 bits of the second word.
-    // The data gets transmitted LSB first which means when we view
-    // this as 2x 16-bit words we need the trigger address FIRST
     trig_gen_fifo u_fifo(.clk(ifclk),
                          .srst(trig_gen_rst[1]),
                          .wr_en(trig_write),
-                         .din( { 8'h00, trig_meta,
-                                 2'b10, trig_address, 2'b00 } ),
+                         .din( { 2'b10, trig_address, 2'b00,
+                                 8'h00, trig_meta } ),
                          .rd_en(trig_tvalid && trig_tready),
                          .valid(trig_tvalid),
                          .dout(trig_tdata));        
