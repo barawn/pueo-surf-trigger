@@ -19,6 +19,8 @@ module generator_wrap #(parameter WBCLKTYPE = "NONE",
     wire [47:0] beam_mask;
     wire [1:0] beam_wr;
     wire beam_update;
+
+    wire [11:0] address_offset;
     
     wire gen_rst;
     generator_wb_core #(.WBCLKTYPE(WBCLKTYPE),
@@ -29,6 +31,7 @@ module generator_wrap #(parameter WBCLKTYPE = "NONE",
              .ifclk_running_i(ifclk_running_i),
              .agc_reset_o(agc_reset_o), // silliness
              .gen_rst_o(gen_rst),
+             .offset_o(address_offset),
              .beam_mask_o(beam_mask),
              .beam_mask_wr_o(beam_wr),
              .beam_mask_update_o(beam_update));                       
@@ -44,6 +47,7 @@ module generator_wrap #(parameter WBCLKTYPE = "NONE",
                   .mask_i(beam_mask),
                   .mask_wr_i(beam_wr),
                   .mask_update_i(beam_update),
+                  .offset_i(address_offset),
                   .gen_rst_i(gen_rst),
                   .runrst_i(runrst_i),
                   .runstop_i(runstop_i),

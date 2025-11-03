@@ -39,6 +39,7 @@ module surf_trig_gen_v3 #(parameter NBEAMS=48,
         // in a 48-bit pair.
         input [47:0] mask_i,
         input [1:0] mask_wr_i,
+        input [11:0] offset_i,
         input mask_update_i,
         input gen_rst_i,
         input ifclk,
@@ -110,6 +111,10 @@ module surf_trig_gen_v3 #(parameter NBEAMS=48,
     reg trig_running = 0;
     // address to capture
     reg [11:0] current_address = {12{1'b0}};
+    // address offset
+    (* CUSTOM_CC_DST = IFCLKTYPE *)
+    reg [11:0] offset_in_ifclk = {12{1'b0}};
+    
     
     // captured address    
     reg [11:0] trig_address = {12{1'b0}};
@@ -193,6 +198,7 @@ module surf_trig_gen_v3 #(parameter NBEAMS=48,
                .trig_o(meta_trigger_out));       
                         
     always @(posedge ifclk) begin
+        if (runrst_i) offset_in_ifclk <= offset_i;
         // now time aligned with trigger
         triggered_beams_rereg <= triggered_beams;
         // now time aligned with trigger_registered
@@ -220,19 +226,20 @@ module surf_trig_gen_v3 #(parameter NBEAMS=48,
         if (!trig_running) current_address <= 12'd1;
         else current_address <= current_address + 1;
 
-        if (trigger_registered) trig_address <= current_address;
+        if (trigger_registered) trig_address <= current_address + offset_in_ifclk;
         
         trig_write <= trigger_registered;
     end
     
     // now just buffer it and send it out
     // Metadata is currently the bottom 8 bits of the second word.
+    // The data gets transmitted LSB first which means when we view
+    // this as 2x 16-bit words we need the trigger address FIRST
     trig_gen_fifo u_fifo(.clk(ifclk),
                          .srst(trig_gen_rst[1]),
                          .wr_en(trig_write),
-                         .din( { 2'b10, trig_address, 2'b00,
-                                 8'h00,
-                                 trig_meta } ),
+                         .din( { 8'h00, trig_meta,
+                                 2'b10, trig_address, 2'b00 } ),
                          .rd_en(trig_tvalid && trig_tready),
                          .valid(trig_tvalid),
                          .dout(trig_tdata));        

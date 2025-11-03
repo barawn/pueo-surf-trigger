@@ -9,6 +9,7 @@ module generator_wb_core #(parameter WBCLKTYPE = "NONE",
         output agc_reset_o,
         input ifclk,
         output gen_rst_o,
+        output [11:0] offset_o,
         output [47:0] beam_mask_o,
         output [1:0] beam_mask_wr_o,
         output beam_mask_update_o
@@ -20,6 +21,9 @@ module generator_wb_core #(parameter WBCLKTYPE = "NONE",
     reg [1:0] beam_wr = {2{1'b0}};
     (* CUSTOM_CC_SRC = WBCLKTYPE *)
     reg beam_preupdate = 1'b0;
+    
+    (* CUSTOM_CC_SRC = WBCLKTYPE *)
+    reg [11:0] address_offset = {12{1'b0}};
     
     (* CUSTOM_CC_SRC = WBCLKTYPE *)
     reg gen_rst = 0;
@@ -41,14 +45,14 @@ module generator_wb_core #(parameter WBCLKTYPE = "NONE",
     // to their proper values.
     // Because we currently only have 4 registers, we shadow everything
     // as well and our mask is just 13'hF.    
-    localparam [14:0] CONTROL_REG_0 = 15'h2000; // unused
+    localparam [14:0] CONTROL_REG_0 = 15'h2000; // offset
     localparam [14:0] CONTROL_REG_1 = 15'h2004; // generator reset
     localparam [14:0] MASK_REG_0 =    15'h2008; // low 18 beams
     localparam [14:0] MASK_REG_1 =    15'h200C; // high 18 beams
             
     reg [31:0] wb_dat = {32{1'b0}};
     wire [31:0] wb_regs[3:0];
-    assign wb_regs[0] = {32{1'b0}};
+    assign wb_regs[0] = { {20{address_offset[11]}}, address_offset };
     assign wb_regs[1] = { {16{1'b0}}, {7{1'b0}}, gen_rst, {6{1'b0}}, agc_reset, 1'b0 };
     assign wb_regs[2] = { {14{1'b0}}, beam_mask[0 +: 18] };
     assign wb_regs[3] = { {2{1'b0}}, beam_mask[18 +: 30] };
@@ -86,6 +90,10 @@ module generator_wb_core #(parameter WBCLKTYPE = "NONE",
             agc_reset <= wb_dat_i[1];
             gen_rst <= wb_dat_i[8];
         end
+
+        if (state == WRITE && `ADDR_MATCH(wb_adr_i, CONTROL_REG_0, 13'hF)) begin
+            address_offset <= wb_dat_i[11:0];
+        end
         
         if (state == CAPTURE) wb_dat <= wb_regs[wb_adr_i[3:2]];
         
@@ -119,6 +127,8 @@ module generator_wb_core #(parameter WBCLKTYPE = "NONE",
     assign beam_mask_o = beam_mask;
     assign beam_mask_wr_o = beam_wr_ifclk;
     assign beam_mask_update_o = beam_update;
+    
+    assign offset_o = address_offset;
     
     assign gen_rst_o = gen_rst;
     
