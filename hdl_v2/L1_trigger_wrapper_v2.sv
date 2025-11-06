@@ -68,7 +68,7 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
 
 
     // this is the threshold space
-    localparam L1TYPE = (TRIGGER_TYPE == "V31500") ? "V3" : TRIGGER_TYPE;
+    localparam L1TYPE = (TRIGGER_TYPE == "V31500") ? "V3SKEW" : TRIGGER_TYPE;
     L1_trigger_v2 #(.NBEAMS(NBEAMS),
                     .TRIGGER_TYPE(L1TYPE),
                     .WBCLKTYPE(WBCLKTYPE),
@@ -135,11 +135,13 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
                         .dat_o(data_stage_connection));
         end else begin : MIE
             localparam CHAIN_TYPE = (TRIGGER_TYPE == "V31500") ? "HALF" : "FULL";
+            localparam SKEW_TOP_CHANNELS = (TRIGGER_TYPE == "V31500") ? "TRUE" : "FALSE";
             trigger_chain_x8_wrapper #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
-                                   .HDL_FILTER_VERSION("SYSTOLIC"),
+                                   .HDL_FILTER_VERSION("V4"),
                                    .AGC_CONTROL(AGC_CONTROL),
                                    .USE_BIQUADS(USE_BIQUADS),
                                    .CHAIN_TYPE(CHAIN_TYPE),
+                                   .SKEW_TOP_CHANNELS(SKEW_TOP_CHANNELS),
                                    .WBCLKTYPE(WBCLKTYPE),.CLKTYPE(CLKTYPE))
                     u_chain(
                         .wb_clk_i(wb_clk_i),
