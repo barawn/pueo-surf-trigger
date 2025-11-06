@@ -9,6 +9,7 @@
 module trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
                                   parameter USE_BIQUADS = "FALSE",
                                   parameter HDL_FILTER_VERSION = "DEFAULT",
+                                  parameter SKEW_TOP_CHANNELS = "FALSE",
                                   parameter CLKTYPE = "NONE",
                                   parameter CHAIN_TYPE = "FULL",
                                   parameter AGC_CONTROL = "FALSE",
@@ -112,7 +113,10 @@ module trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
             assign wb_agc_connect_sel_o = wb_agc_sel_i;
 
             if (CHAIN_TYPE == "HALF") begin : H
+                localparam PIPE_TO_FILTER = (idx == 0 || idx == 4) && (SKEW_TOP_CHANNELS == "TRUE") ?
+                    "FALSE" : "TRUE";
                 trigger_chain_wrapper_1500 #(.AGC_TIMESCALE_REDUCTION_BITS(AGC_TIMESCALE_REDUCTION_BITS),
+                                        .PIPE_TO_FILTER(PIPE_TO_FILTER),
                                         .USE_BIQUADS(USE_BIQUADS),
                                         .HDL_FILTER_VERSION(HDL_FILTER_VERSION),
                                         .AGC_CONTROL(AGC_CONTROL),
