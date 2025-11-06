@@ -100,8 +100,10 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
                                 .thresh_update_i(thresh_update),
                                 .trigger_o(triggers));
         end
-        else if (TRIGGER_TYPE == "V3") begin : O3
+        else if (TRIGGER_TYPE == "V3" || TRIGGER_TYPE == "V3SKEW") begin : O3
+            localparam SKEWED_TOP = (TRIGGER_TYPE == "V3SKEW") ? "TRUE" : "FALSE";
             beamform_trigger_v3 #(.FULL(NBEAMS == 2 ? "FALSE" : "TRUE"),
+                                  .SKEWED_TOP(SKEWED_TOP),
                                   .DEBUG(NBEAMS == 2 ? "TRUE" : "FALSE"))
                 u_beam_trigger( .clk_i(tclk),
                                 .data_i(dat_i),
