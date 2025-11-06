@@ -36,6 +36,7 @@ import pueo_dummy_beams::*;
 
 module beamform_trigger_v3 #(parameter FULL = "TRUE",
                              parameter DEBUG = "FALSE",
+                             parameter SKEWED_TOP = "FALSE",
                              localparam NBEAMS = (FULL == "TRUE") ? NUM_BEAM : NUM_DUMMY,
                              localparam NBITS=5,
                              localparam NSAMP=8,
@@ -119,7 +120,11 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
                                                                 LEFT_ADDERS_DUMMY[l];
             // find the inputs                                                                
             for (l_ch=0;l_ch<3;l_ch=l_ch+1) begin : LC
-                int l_d = (NUM_SAMPLE_STORE-1)*NSAMP - left_delay[l_ch];
+                // skew the beam delays if the top channels are skewed,
+                // but only if we actually use them (which means their delays are greater than 8)
+                int l_d = (NUM_SAMPLE_STORE-1)*NSAMP - (left_delay[l_ch] - ((left_delay[l_ch] >= 8 && SKEWED_TOP == "TRUE") ? 8 : 0));
+//                int offset = (SKEWED_TOP == "TRUE") ? 8 : 0;
+//                int l_d = (l_nominal_d < 8) ? l_nominal_d : l_nominal_d - offset;
                 assign left_triplet_inputs[l][l_ch] = sample_store[LEFT_INDICES[l_ch]][(l_d)*NBITS +: NSAMP*NBITS];                
             end
             // and feed into the adder
@@ -147,7 +152,9 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
                                                                  RIGHT_ADDERS_DUMMY[r];
             // find the inputs                                                                
             for (r_ch=0;r_ch<3;r_ch=r_ch+1) begin : LC
-                int r_d = (NUM_SAMPLE_STORE-1)*NSAMP - right_delay[r_ch];
+                int r_d = (NUM_SAMPLE_STORE-1)*NSAMP - (right_delay[r_ch] - ((right_delay[r_ch] >= 8 && SKEWED_TOP == "TRUE") ? 8 : 0));
+//                int offset = (SKEWED_TOP == "TRUE") ? 8 : 0;
+//                int r_d = (r_nominal_d < 8) ? r_nominal_d : r_nominal_d - offset;
                 assign right_triplet_inputs[r][r_ch] = sample_store[RIGHT_INDICES[r_ch]][(r_d)*NBITS +: NSAMP*NBITS];                
             end
             // and feed into the adder
