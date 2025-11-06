@@ -499,7 +499,7 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
     // Matched Filter    
     matched_filter_v3_1500 u_matched_filter(
         .aclk(aclk),
-        .data_i(pipe_to_filter),
+        .data_i(data_to_filter),
         .data_o(match_out)
     );
 
