@@ -16,6 +16,7 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                                      parameter OFFSET_ERR = 5,
                                      parameter STARTING_SCALE_DELTA = 30,
                                      parameter STARTING_OFFSET_DELTA = 25,
+                                     parameter PIPE_TO_FILTER = "TRUE",
                                      parameter WBCLKTYPE = "PSCLK",
                                      parameter CLKTYPE = "ACLK",
                                      parameter AGC_CONTROL = "FALSE")(  
@@ -447,8 +448,8 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
         lpf_out[48 +: 12],
         lpf_out[24 +: 12],
         lpf_out[0 +: 12] };
-    // Pipe to the matched filter.
-    reg [47:0] pipe_to_filter = {48{1'b0}};
+    // Optional pipe to the matched filter.
+    wire [47:0] data_to_filter;
     // Matched filter output.
     wire [47:0] match_out;
     // Pipe to the biquads.
@@ -461,13 +462,22 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
     wire [95:0] to_agc;
     
     always @(posedge aclk) begin
-        pipe_to_filter <= lpf_out_1500;
         pipe_to_biquad <= match_out;        
     end 
 
     // Low pass filter
     generate
         wire [7:0][12:0] lpf_out_tmp;
+        // Channels 0 and 4 cheat a clock here.
+        if (PIPE_TO_FILTER == "TRUE") begin : P
+            reg [47:0] pipe_to_filter = {48{1'b0}};
+            always @(posedge aclk) begin : PL
+                pipe_to_filter <= lpf_out_1500;
+            end
+            assign data_to_filter = pipe_to_filter;
+        end else begin
+            assign data_to_filter = lpf_out_1500;
+        end
         if (HDL_FILTER_VERSION == "V4") begin : V4
             shannon_whitaker_lpfull_v4
                 u_lpf( .clk_i(aclk),
