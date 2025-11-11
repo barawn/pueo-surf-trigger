@@ -62,6 +62,11 @@ module agc_dsp #(parameter Q_SCALE = 12,
         output gt_o,
         output lt_o    );
 
+    // We previously had this set to 1 (as ADREG) -
+    // we don't need it for timing, so slice it away to save power.
+    // It's not exactly a small amount, it's like 27*8*8 = 1728 FFs toggling.
+    localparam PREADD_REGISTER = 0;
+
     // LOTS OF FIXED POINT TRACKING
 
     // We need to figure out which of the DAT or OFFSET have more fractional bits, and we choose the larger.
@@ -117,7 +122,7 @@ module agc_dsp #(parameter Q_SCALE = 12,
     wire patternmatch;
     wire patternbmatch;
     (* CUSTOM_CC_DST = CLKTYPE *)
-    DSP48E2 #(.AREG(2),.BREG(2),`C_UNUSED_ATTRS,.DREG(1),.ADREG(1),.MREG(1),
+    DSP48E2 #(.AREG(2),.BREG(2),`C_UNUSED_ATTRS,.DREG(1),.ADREG(PREADD_REGISTER),.MREG(1),
               .PREG(1),.USE_PATTERN_DETECT("PATDET"),
               .SEL_MASK("MASK"),
               .SEL_PATTERN("PATTERN"),
