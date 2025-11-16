@@ -479,7 +479,7 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
             assign data_to_filter = lpf_out_1500;
         end
         if (HDL_FILTER_VERSION == "V4") begin : V4
-            shannon_whitaker_lpfull_v4
+            shannon_whitaker_lpfull_v4 #(.SHREG("NO"))
                 u_lpf( .clk_i(aclk),
                        .rst_i(1'b0),
                        .dat_i(dat_i),
