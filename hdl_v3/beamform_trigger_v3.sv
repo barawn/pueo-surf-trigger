@@ -137,7 +137,7 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
         for (r=0;r<NUM_RIGHT_ADDERS;r=r+1) begin : RA
             if (NUM_RIGHT_STORE > 1) begin : RS
                 sample_store #(.NBITS(SB_BITS),
-                               .PIPE("FALSE"),
+                               .PIPE("TRUE"),
                                .NSAMP(8),
                                .SAMPLE_STORE_DEPTH(NUM_LEFT_STORE))
                                u_store(.clk_i(clk_i),                               
@@ -178,12 +178,19 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
                 int t_d = (NUM_SAMPLE_STORE-1)*NSAMP - top_delay[t_ch];
                 assign top_doublet_inputs[t][t_ch] = sample_store[TOP_INDICES[t_ch]][(t_d)*NBITS +: NSAMP*NBITS];
             end
+            
+            reg [NSAMP*SB_BITS-1:0] top_doublet_reg = {NSAMP*SB_BITS{1'b0}};
+            wire [NSAMP*SB_BITS-1:0] top_doublet_out;
+            always @(posedge clk_i) begin : RR
+                top_doublet_reg <= top_doublet_out;
+            end
             // and feed into the adder
             sub_beam u_tb(.clk_i(clk_i),
                           .chA_i(top_doublet_inputs[t][0]),
                           .chB_i(top_doublet_inputs[t][1]),
                           .chC_i({NSAMP{sym_shift}}),
-                          .dat_o(top_doublets[t]));
+                          .dat_o(top_doublet_out));
+            assign top_doublets[t] = top_doublet_reg;
         end
         // and now we build the beams
         for (b=0;b<NBEAMS;b=b+2) begin : BB

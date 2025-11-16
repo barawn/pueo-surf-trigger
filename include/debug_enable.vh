@@ -1,2 +1,2 @@
-// Uncomment to use the debug pathways in the trigger
-//`define USING_DEBUG 0
+// Uncomment to flip on the debug ILAs
+//`define USING_DEBUG 1

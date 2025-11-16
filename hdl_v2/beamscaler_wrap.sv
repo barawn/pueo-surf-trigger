@@ -1,5 +1,8 @@
 `timescale 1ns / 1ps
 `define DLYFF #0.1
+
+`include "debug_enable.vh"
+
 // 12-bit scaler module. This effectively
 // uses 0.5 DSPs/scaler, which is double
 // what would be needed because we swap
@@ -206,6 +209,7 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
 
     generate
         genvar i;
+        `ifdef USING_DEBUG
         if (DEBUG == "TRUE") begin : DBG
             // just cheat for now
             localparam int DBG0 = 0;
@@ -228,6 +232,7 @@ module beamscaler_wrap #(parameter NBEAMS = 2,
                                  .probe3(trig_flag),
                                  .probe4(subthresh_flag));
         end
+        `endif
         for (i=0;i<NUM_QSCAL;i=i+1) begin : BSC
             // QSCAL 0 gets: count_i[NBEAMS+1], count_i[1], count_i[NBEAMS], count_i[0]
             wire [3:0] count_in;

@@ -1,6 +1,7 @@
 `timescale 1ns / 1ps
 // THIS HAS TO BE MODIFIED FOR ANYTHING MORE THAN 48 BEAMS
 // NO METADATA YET FRIGGIN DEAL WITH IT
+`include "debug_enable.vh"
 `include "interfaces.vh"
 `include "dsp_macros.vh"
 // NOTE NOTE NOTE - THIS HAS TO BE RUNNING OUTSIDE OF TCLK
@@ -242,6 +243,7 @@ module surf_trig_gen_v3 #(parameter NBEAMS=48,
                          .valid(trig_tvalid),
                          .dout(trig_tdata));        
 
+    `ifdef USING_DEBUG
     generate
         if (DEBUG == "TRUE") begin : ILA
             (* CUSTOM_CC_DST = IFCLKTYPE *)
@@ -259,4 +261,5 @@ module surf_trig_gen_v3 #(parameter NBEAMS=48,
                               .probe6(trig_running));
         end
     endgenerate
+    `endif
 endmodule
