@@ -35,7 +35,9 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
         input ifclk_running_i,
         input runrst_i,
         input runstop_i,
-
+        input notch_update_i,
+        input [5:0] notch0_byp_i,
+        input [5:0] notch1_byp_i,
         `HOST_NAMED_PORTS_AXI4S_MIN_IF(m_trig_ , 32)
     );
     
@@ -151,6 +153,9 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
                         .reset_i(1'b0), 
                         .agc_reset_i(agc_reset),
                         .aclk(tclk),
+                        .notch_update_i(notch_update_i),
+                        .notch0_byp_i(notch0_byp_i),
+                        .notch1_byp_i(notch1_byp_i),
                         .dat_i(dat_i),
                         .dat_o(data_stage_connection));
         end

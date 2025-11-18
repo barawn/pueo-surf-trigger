@@ -27,6 +27,9 @@ module trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
         input reset_i, 
         input agc_reset_i,
         input aclk,
+        input [5:0] notch0_byp_i,
+        input [5:0] notch1_byp_i,
+        input notch_update_i,
         input [7:0][95:0] dat_i ,
         output [7:0][39:0] dat_o 
     );
@@ -129,6 +132,9 @@ module trigger_chain_x8_wrapper #(parameter AGC_TIMESCALE_REDUCTION_BITS = 2,
                     .reset_i(reset_i),
                     .agc_reset_i(agc_reset_i), 
                     .aclk(aclk),
+                    .notch_update_i(notch_update_i),
+                    .notch0_byp_i(notch0_byp_i),
+                    .notch1_byp_i(notch1_byp_i),
                     .dat_i(dat_i[idx]),
                     .dat_o(dat_o[idx]));            
             end else begin : F

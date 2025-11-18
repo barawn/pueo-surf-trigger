@@ -13,6 +13,9 @@ module biquad8_x2_wrapper #(parameter WBCLKTYPE="NONE",
         `TARGET_NAMED_PORTS_WB_IF( wb_ , 8, 32 ),  // Address width, data width    
         input reset_BQ_i,
         input aclk,
+        input notch_update_i,
+        input [5:0] notch0_byp_i,
+        input [5:0] notch1_byp_i,
         input [12*NSAMP-1:0] dat_i,
         
         output [12*NSAMP-1:0] dat_o
@@ -82,6 +85,8 @@ module biquad8_x2_wrapper #(parameter WBCLKTYPE="NONE",
                           .clk_i(aclk),
                           .rst_i(reset_BQ_i),
                           .global_update_i(1'b0),
+                          .notch_update_i(notch_update_i),
+                          .notch_byp_i(notch0_byp_i),
                           .dat_i(dat_i),
                           .dat_o(bq_out[0]));   
         
@@ -98,6 +103,8 @@ module biquad8_x2_wrapper #(parameter WBCLKTYPE="NONE",
                           .clk_i(aclk),
                           .rst_i(reset_BQ_i),
                           .global_update_i(1'b0),
+                          .notch_update_i(notch_update_i),
+                          .notch_byp_i(notch1_byp_i),
                           .dat_i(bq_out[0]),
                           .dat_o(bq_out[1]));   
         end else begin : V1
