@@ -455,7 +455,7 @@ module lowampa_trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS =
     endgenerate
     
     // Matched Filter
-    lowampa_matched_filter_v2 u_matched_filter(
+    lowampa_matched_filter_v3 u_matched_filter(
         .clk_i(aclk),
         .in_i(pipe_to_filter),
         .out_o(match_out)
