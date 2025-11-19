@@ -67,7 +67,7 @@ module biquad8_x2_wrapper #(parameter WBCLKTYPE="NONE",
     
 
     // these are the outputs
-    wire [15*NSAMP-1:0] bq_out[1:0];
+    wire [16*NSAMP-1:0] bq_out[1:0];
     
     generate
         genvar i;
