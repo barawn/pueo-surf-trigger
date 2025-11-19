@@ -73,14 +73,15 @@ module biquad8_x2_wrapper #(parameter WBCLKTYPE="NONE",
         genvar i;
         for (i=0;i<NSAMP;i=i+1) begin : LP
             reg [11:0] sat_data = {12{1'b0}};
+            wire [3:0] high_bits = bq_out[1][16*i + 12 +: 4];
             always @(posedge wb_clk_i) begin
                 // top bit never changes
-                sat_data[11] <= bq_out[1][16*i + 15];
+                sat_data[11] <= high_bits[3];
                 // clip at 12 bits so check bits 15/14/13/12
-                if (bq_out[1][16*i + 12 +: 14] != 4'b1111 &&
-                    bq_out[1][16*i + 12 +: 14] != 4'b0000) begin
+                if (high_bits != 4'b1111 &&
+                    high_bits != 4'b0000) begin
                     // bottom bits are flipped
-                    sat_data[0 +: 11] <= {11{~bq_out[1][16*i + 15]}};
+                    sat_data[0 +: 11] <= {11{~high_bits[3]}};
                 end else begin
                     sat_data[0 +: 11] <= bq_out[1][16*i + 2 +: 11];
                 end
