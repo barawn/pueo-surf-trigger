@@ -74,7 +74,7 @@ module biquad8_x2_wrapper #(parameter WBCLKTYPE="NONE",
         for (i=0;i<NSAMP;i=i+1) begin : LP
             reg [11:0] sat_data = {12{1'b0}};
             wire [3:0] high_bits = bq_out[1][16*i + 12 +: 4];
-            always @(posedge wb_clk_i) begin
+            always @(posedge aclk) begin
                 // top bit never changes
                 sat_data[11] <= high_bits[3];
                 // clip at 12 bits so check bits 15/14/13/12
