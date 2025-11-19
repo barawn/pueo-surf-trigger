@@ -67,16 +67,32 @@ module biquad8_x2_wrapper #(parameter WBCLKTYPE="NONE",
     
 
     // these are the outputs
-    wire [12*NSAMP-1:0] bq_out[1:0];
-    assign dat_o = bq_out[1];
+    wire [15*NSAMP-1:0] bq_out[1:0];
     
     generate
+        genvar i;
+        for (i=0;i<NSAMP;i=i+1) begin : LP
+            reg [11:0] sat_data = {12{1'b0}};
+            always @(posedge wb_clk_i) begin
+                // top bit never changes
+                sat_data[11] <= bq_out[1][16*i + 15];
+                // clip at 12 bits so check bits 15/14/13/12
+                if (bq_out[1][16*i + 12 +: 14] != 4'b1111 &&
+                    bq_out[1][16*i + 12 +: 14] != 4'b0000) begin
+                    // bottom bits are flipped
+                    sat_data[0 +: 11] <= {11{~bq_out[1][16*i + 15]}};
+                end else begin
+                    sat_data[0 +: 11] <= bq_out[1][16*i + 2 +: 11];
+                end
+            end
+            assign dat_o[12*i +: 12] = sat_data;
+        end
         if (VERSION == 2) begin : V2
             biquad8_wrapper_v2 #(.NBITS(12),
                               .NFRAC(0),
                               .NSAMP(NSAMP),
-                              .OUTBITS(12),
-                              .OUTFRAC(0),
+                              .OUTBITS(16),
+                              .OUTFRAC(2),
                               .WBCLKTYPE(WBCLKTYPE),
                               .CLKTYPE(CLKTYPE))
                 u_biquad8_A(.wb_clk_i(wb_clk_i),
@@ -90,11 +106,11 @@ module biquad8_x2_wrapper #(parameter WBCLKTYPE="NONE",
                           .dat_i(dat_i),
                           .dat_o(bq_out[0]));   
         
-            biquad8_wrapper_v2 #(.NBITS(12),
-                              .NFRAC(0),
+            biquad8_wrapper_v2 #(.NBITS(16),
+                              .NFRAC(2),
                               .NSAMP(NSAMP),
-                              .OUTBITS(12),
-                              .OUTFRAC(0),
+                              .OUTBITS(16),
+                              .OUTFRAC(2),
                               .WBCLKTYPE(WBCLKTYPE),
                               .CLKTYPE(CLKTYPE))
                 u_biquad8_B(.wb_clk_i(wb_clk_i),
@@ -108,6 +124,7 @@ module biquad8_x2_wrapper #(parameter WBCLKTYPE="NONE",
                           .dat_i(bq_out[0]),
                           .dat_o(bq_out[1]));   
         end else begin : V1
+            // just don't freaking use this crap
             biquad8_wrapper #(.NBITS(12),
                               .NFRAC(0),
                               .NSAMP(NSAMP),
