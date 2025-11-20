@@ -13,7 +13,7 @@ module beamform_trigger_lowampa #(  parameter NBEAMS = 2,
                                     parameter  WBCLKTYPE = "PSCLK", 
                                     parameter  CLKTYPE = "ACLK",
                                     parameter  DEBUG = "FALSE",
-				    parameter  TYPE = "HPOL",
+				    parameter  TTYPE = "HPOL",
                                     localparam NBITS=5,
                                     localparam NSAMP=4, 
                                     localparam NCHAN=8) (
@@ -63,7 +63,7 @@ module beamform_trigger_lowampa #(  parameter NBEAMS = 2,
         for(beam_idx=0; beam_idx<NBEAMS; beam_idx++) begin : VB
             for(chan_idx=0; chan_idx<NCHAN; chan_idx++) begin : VC
                 assign beam_use_array[beam_idx][chan_idx] = beam_use_array_flipped[beam_idx][NCHAN-1-chan_idx]; 
-                assign beam_inv_array[beam_idx][chan_idx] = (TYPE == "VPOL") ? beam_inv_array_flipped_vpol[beam_idx][NCHAN-1-chan_idx] :
+                assign beam_inv_array[beam_idx][chan_idx] = (TTYPE == "VPOL") ? beam_inv_array_flipped_vpol[beam_idx][NCHAN-1-chan_idx] :
 							                       beam_inv_array_flipped_hpol[beam_idx][NCHAN-1-chan_idx];	       
                 for(samp_idx=0; samp_idx<NSAMP; samp_idx++) begin : VS
                     assign vectorized_delayed_data[beam_idx][chan_idx][samp_idx] = beams_delayed[beam_idx][chan_idx][samp_idx*NBITS +: NBITS];
