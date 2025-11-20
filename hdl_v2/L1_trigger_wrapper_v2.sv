@@ -42,7 +42,7 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
     );
     
     localparam AGC_BITS = 5;
-    localparam NSAMPS=(TRIGGER_TYPE == "LF") ? 4 : 8;
+    localparam NSAMPS=(TRIGGER_TYPE == "LFH" || TRIGGER_TYPE == "LFV") ? 4 : 8;
 
     localparam USE_V3 = (TRIGGER_TYPE == "V3" || TRIGGER_TYPE == "V31500") ?
         "TRUE" : "FALSE";
@@ -94,7 +94,7 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
     // For now the AGC reset stuff is pulled from the generator.
     wire agc_reset;
     generate
-        if (TRIGGER_TYPE == "LF") begin : LF
+        if (TRIGGER_TYPE == "LFH" || TRIGGER_TYPE == "LFV") begin : LF
         
             wire [NCHAN-1:0][12*NSAMPS-1:0] dat_downsample;
             function [12*NSAMPS-1:0] downsample;

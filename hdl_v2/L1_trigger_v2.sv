@@ -8,7 +8,7 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
                        parameter CLKTYPE = "NONE",
                        parameter IFCLKTYPE = "NONE",
                        localparam NCHAN=8,
-                       localparam NSAMP=(TRIGGER_TYPE=="LF" ? 4 : 8),
+                       localparam NSAMP=(TRIGGER_TYPE=="LFH" || TRIGGER_TYPE == "LFV" ? 4 : 8),
                        localparam AGC_BITS=5)(
         input wb_clk_i,
         input wb_rst_i,
@@ -91,8 +91,9 @@ module L1_trigger_v2 #(parameter NBEAMS=2,
     
     // this MUST be tclk
     generate
-        if (TRIGGER_TYPE == "LF") begin : LF
-            beamform_trigger_lowampa #(.NBEAMS(NBEAMS))
+        if (TRIGGER_TYPE == "LFH" || TRIGGER_TYPE == "LFV") begin : LF
+            beamform_trigger_lowampa #(.NBEAMS(NBEAMS),
+                                       .TTYPE(TRIGGER_TYPE == "LFH" ? "HPOL" : "VPOL"))
                 u_beam_trigger( .clk_i(tclk),
                                 .data_i(dat_i),
                                 .thresh_i(thresh_dat),
