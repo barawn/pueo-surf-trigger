@@ -40,6 +40,7 @@ module dual_pueo_lowampa_envelope_v2c #(localparam NBITS=14,
                                         parameter OUTBITS=17,
                                         parameter OUTSHIFT=3)(
         input clk_i,
+        input rst_i,
         input [NBITS*NSAMP-1:0] squareA_i,
         input [NBITS*NSAMP-1:0] squareB_i,
         
@@ -166,11 +167,15 @@ module dual_pueo_lowampa_envelope_v2c #(localparam NBITS=14,
     two24_dsp #(.USE_AB(0),
                 .CREG(1),
                 .PREG(1),
+                .USE_RST(1),                
                 .CASCADE("TRUE"),
                 .RND(dspC_RND),
                 .OPMODE(dspC_OPMODE),
                 .ALUMODE(dspC_ALUMODE))
                 u_dspC(.clk_i(clk_i),
+                       .rst_p_i(rst_i),
+                       .rst_c_i(1'b0),
+                       .rst_ab_i(1'b0),
                        .C_i(dspC_C),
                        .pc_i(dspB_to_dspC),
                        .P_o(dspC_out));
