@@ -509,8 +509,11 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
     // Biquads
     generate
         if (USE_BIQUADS == "TRUE") begin : BQ2
-//            reg [47:0] pipe_to_upsample = {47{1'b0}};
-            assign to_agc = upsample_out;
+            reg [95:0] pipe_to_agc = {96{1'b0}};
+            assign to_agc = pipe_to_agc;
+            always @(posedge aclk) begin
+                pipe_to_agc <= upsample_out;
+            end
 //            always @(posedge aclk) begin
 //                pipe_to_upsample <= biquad_out;
 //            end
