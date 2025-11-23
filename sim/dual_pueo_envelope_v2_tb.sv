@@ -46,10 +46,10 @@ module dual_pueo_envelope_v2_tb;
         
         #100;                          
         @(posedge clk);
-            #0.1 sq[0] = 6006;
-                 sq[1] = 6006;
-                 sq[2] = 6006;
-                 sq[3] = 6006; // sums to 30
+            #0.1 sq[0] = 1;
+                 sq[1] = 4;
+                 sq[2] = 9;
+                 sq[3] = 16; // sums to 30
                  sq[4] = 25;
                  sq[5] = 36;
                  sq[6] = 49;

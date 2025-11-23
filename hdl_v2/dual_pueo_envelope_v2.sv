@@ -1,5 +1,6 @@
 `timescale 1ns / 1ps
 `include "dsp_macros.vh"
+`define DLYFF #0.1
 // This module forms the envelope signal, which is what
 // we threshold on.
 // The current version is equivalent to a sum of 8 samples
@@ -155,6 +156,14 @@ module dual_pueo_envelope_v2 #(localparam NBITS=14,
     // This is an annoying quirk in HDL - you can't really get the carry of a subtract
     // operation, so pipelining it is a giant disaster. 
 
+    // I feel like I can shave registers here though?
+    //
+    // use_undelayed_A/use_undelayed_B go back 1 clock
+    // sq_sum30_A can go back a clock (it becomes sum30_A_shreg[0] and lowbit30_A_shreg[2])
+    // sq_sum74_A can go back a clock (eliminate sum74_storeA).
+    //
+    // However we'll leave them here for now for the routability I guess.    
+
     // Since we can't actually use the subtractor due to HDL quirkiness, we have to do
     // the math ourselves.
     
@@ -168,99 +177,142 @@ module dual_pueo_envelope_v2 #(localparam NBITS=14,
         
     reg [12:0] sum74_storeA = {13{1'b0}};
     wire [12:0] sum74_A = {test_carry[1], dsp_out[1]};
+    // this is the difference between sum74 and the prior, for beam A. We only use top bit.
     wire [13:0] sum74_diffA = {1'b0,sum74_A} + {1'b1,~sum74_storeA} + lowbit_store_carryA;
     reg use_undelayed_A = 0;
-    reg use_undelayed_A_store = 0;
 
     reg [12:0] sum74_storeB = {13{1'b0}};
     wire [12:0] sum74_B = {test_carry[3], dsp_out[3]};
+    // difference between sum74 and the prior, for beam B. Only use top bit.
     wire [13:0] sum74_diffB = {1'b0,sum74_B} + {1'b1,~sum74_storeB} + lowbit_store_carryB;
     reg use_undelayed_B = 0;
-    reg use_undelayed_B_store = 0;
         
-    wire [13:0] sum30_A = {test_carry[0], dsp_out[0]};
-    wire [13:0] sum30_B = {test_carry[2], dsp_out[2]};    
+    // these are 13 bits wide - 12 bit output, 1 bit carry
+    wire [12:0] sum30_A = {test_carry[0], dsp_out[0]};
+    wire [12:0] sum30_B = {test_carry[2], dsp_out[2]};    
 
     // We delay sum30_A by 3 and the lowbit store by 4 to line them up.
-    (* SRL_STYLE = "srl_reg" *)
-    reg [1:0][13:0] sum30_A_shreg = {3*14{1'b0}};
-    (* SRL_STYLE = "srl_reg" *)
-    reg [3:0][2:0] lowbit30_A_shreg = {5*3{1'b0}};
+    // these are 13 bits wide
+    (* SRL_STYLE = "register" *)
+    reg [1:0][12:0] sum30_A_shreg = {2*13{1'b0}};
+    (* SRL_STYLE = "register" *)
+    reg [3:0][2:0] lowbit30_A_shreg = {4*3{1'b0}};
+    (* SRL_STYLE = "register" *)
+    reg [1:0][12:0] sum30_B_shreg = {2*13{1'b0}};
+    (* SRL_STYLE = "register" *)
+    reg [3:0][2:0] lowbit30_B_shreg = {4*3{1'b0}};
 
-    (* SRL_STYLE = "srl_reg" *)
-    reg [1:0][13:0] sum30_B_shreg = {3*14{1'b0}};
-    (* SRL_STYLE = "srl_reg" *)
-    reg [3:0][2:0] lowbit30_B_shreg = {5*3{1'b0}};
-            
+    // sum74 needs to be delayed by either 1 or 2.
+    // The low bits need an additional 2 clocks (3 or 4)
+    // One of those clocks we absorb in a decision register.
+    // So the lowbits need a 3 clock shreg, and the
+    // rest need a 1 clock shreg (just a reregister)
+    (* SRL_STYLE = "register" *)
+    reg [2:0][2:0] lowbit74_A_shreg = {3*3{1'b0}};
+    reg [12:0] sum74_A_reg = {13{1'b0}};
+    wire [15:0] this_sum74_A = { sum74_storeA, lowbit74_A_shreg[1] };
+    wire [15:0] last_sum74_A = { sum74_A_reg, lowbit74_A_shreg[2] };
+    reg [15:0] sum74_A_final = {16{1'b0}};   
+    
+    (* SRL_STYLE = "register" *)
+    reg [2:0][2:0] lowbit74_B_shreg = {3*3{1'b0}};
+    reg [12:0] sum74_B_reg = {13{1'b0}};
+    wire [15:0] this_sum74_B = { sum74_storeB, lowbit74_B_shreg[1] };
+    wire [15:0] last_sum74_B = { sum74_B_reg, lowbit74_B_shreg[2] };
+    reg [15:0] sum74_B_final = {16{1'b0}};   
+                    
     wire [15:0] sq_sum30_A;
     wire [15:0] sq_sum30_B;
 
     wire [15:0] sq_sum74_A;
     wire [15:0] sq_sum74_B;                
     always @(posedge clk_i) begin
-        lowbit_store74_A <= lowbit74_A;
-        lowbit_store74_B <= lowbit74_B;
+        lowbit_store74_A <= `DLYFF lowbit74_A;
+        lowbit_store74_B <= `DLYFF lowbit74_B;
         
-        lowbit_carryA <= lowbit_store74_diffA[3];
-        lowbit_store_carryA <= lowbit_carryA;
-        lowbit_carryB <= lowbit_store74_diffB[3];
-        lowbit_store_carryB <= lowbit_carryB;
+        lowbit_carryA <= `DLYFF lowbit_store74_diffA[3];
+        lowbit_store_carryA <= `DLYFF lowbit_carryA;
+        lowbit_carryB <= `DLYFF lowbit_store74_diffB[3];
+        lowbit_store_carryB <= `DLYFF lowbit_carryB;
     
-        sum74_storeA <= sum74_A;
-        sum74_storeB <= sum74_B;
+        sum74_storeA <= `DLYFF sum74_A;
+        sum74_storeB <= `DLYFF sum74_B;
         
-        use_undelayed_A <= sum74_diffA[13];
-        use_undelayed_A_store <= use_undelayed_A;
-        use_undelayed_B <= sum74_diffB[13];
-        use_undelayed_B_store <= use_undelayed_B;
+        use_undelayed_A <= `DLYFF sum74_diffA[13];
+        use_undelayed_B <= `DLYFF sum74_diffB[13];
         
-        sum30_A_shreg[0] <= sum30_A;
-        sum30_A_shreg[1] <= sum30_A_shreg[0];
+        sum30_A_shreg[0] <= `DLYFF sum30_A;
+        sum30_A_shreg[1] <= `DLYFF sum30_A_shreg[0];
 
-        lowbit30_A_shreg[0] <= lowbit30_A;
-        lowbit30_A_shreg[1] <= lowbit30_A_shreg[0];
-        lowbit30_A_shreg[2] <= lowbit30_A_shreg[1];
-        lowbit30_A_shreg[3] <= lowbit30_A_shreg[2];
+        lowbit30_A_shreg[0] <= `DLYFF lowbit30_A;
+        lowbit30_A_shreg[1] <= `DLYFF lowbit30_A_shreg[0];
+        lowbit30_A_shreg[2] <= `DLYFF lowbit30_A_shreg[1];
+        lowbit30_A_shreg[3] <= `DLYFF lowbit30_A_shreg[2];
 
-        sum30_B_shreg[0] <= sum30_B;
-        sum30_B_shreg[1] <= sum30_B_shreg[0];
+        sum30_B_shreg[0] <= `DLYFF sum30_B;
+        sum30_B_shreg[1] <= `DLYFF sum30_B_shreg[0];
 
-        lowbit30_B_shreg[0] <= lowbit30_B;
-        lowbit30_B_shreg[1] <= lowbit30_B_shreg[0];
-        lowbit30_B_shreg[2] <= lowbit30_B_shreg[1];
-        lowbit30_B_shreg[3] <= lowbit30_B_shreg[2];
+        lowbit30_B_shreg[0] <= `DLYFF lowbit30_B;
+        lowbit30_B_shreg[1] <= `DLYFF lowbit30_B_shreg[0];
+        lowbit30_B_shreg[2] <= `DLYFF lowbit30_B_shreg[1];
+        lowbit30_B_shreg[3] <= `DLYFF lowbit30_B_shreg[2];
+        
+        lowbit74_A_shreg[0] <= `DLYFF lowbit_store74_A;
+        lowbit74_A_shreg[1] <= `DLYFF lowbit74_A_shreg[0];
+        lowbit74_A_shreg[2] <= `DLYFF lowbit74_A_shreg[1];
+        sum74_A_reg <= `DLYFF sum74_storeA;
+
+        // this is badly named
+        // if this is set we want a 4 clock delay on lowbits and 2 clock delay on highbits
+        if (use_undelayed_A) begin
+            sum74_A_final <= `DLYFF last_sum74_A;
+        end else begin
+            sum74_A_final <= `DLYFF this_sum74_A;
+        end
+
+        lowbit74_B_shreg[0] <= `DLYFF lowbit_store74_B;
+        lowbit74_B_shreg[1] <= `DLYFF lowbit74_B_shreg[0];
+        lowbit74_B_shreg[2] <= `DLYFF lowbit74_B_shreg[1];
+        sum74_B_reg <= `DLYFF sum74_storeB;
+        if (use_undelayed_B) begin
+            sum74_B_final <= `DLYFF last_sum74_B;
+        end else begin
+            sum74_B_final <= `DLYFF this_sum74_B;
+        end
     end
 
     assign sq_sum30_A = { sum30_A_shreg[1], lowbit30_A_shreg[3] };
     assign sq_sum30_B = { sum30_B_shreg[1], lowbit30_B_shreg[3] };
 
-    // now we stick everything into an SRL, and adjust the length
-    // to line up based on use_undelayed_A.
-    srlvec #(.NBITS(13))
-        u_sum74_dlyA(.clk(clk_i),
-                     .ce(1'b1),
-                     .a( { 3'b000, use_undelayed_A_store}),
-                     .din( sum74_storeA ),
-                     .dout(sq_sum74_A[15:3]));
-    srlvec #(.NBITS(3))
-        u_lb74_dlyA(.clk(clk_i),
-                    .ce(1'b1),
-                    .a( { 3'b001, use_undelayed_A_store}),
-                    .din( lowbit_store74_A ),
-                    .dout(sq_sum74_A[2:0]));                     
+    assign sq_sum74_A = sum74_A_final;
+    assign sq_sum74_B = sum74_B_final;
+//    // now we stick everything into an SRL, and adjust the length
+//    // to line up based on use_undelayed_A.
+//    srlvec #(.NBITS(13))
+//        u_sum74_dlyA(.clk(clk_i),
+//                     .ce(1'b1),
+//                     .a( { 3'b000, use_undelayed_A_store}),
+//                     .din( sum74_storeA ),
+//                     .dout(sq_sum74_A[15:3]));
+//    srlvec #(.NBITS(3))
+//        u_lb74_dlyA(.clk(clk_i),
+//                    .ce(1'b1),
+//                    .a( { 3'b001, use_undelayed_A_store}),
+//                    .din( lowbit_store74_A ),
+//                    .dout(sq_sum74_A[2:0]));                     
 
-    srlvec #(.NBITS(13))
-        u_sum74_dlyB(.clk(clk_i),
-                     .ce(1'b1),
-                     .a( { 3'b000, use_undelayed_B_store}),
-                     .din( sum74_storeB ),
-                     .dout(sq_sum74_B[15:3]));
-    srlvec #(.NBITS(3))
-        u_lb74_dlyB(.clk(clk_i),
-                    .ce(1'b1),
-                    .a( { 3'b001, use_undelayed_B_store }),
-                    .din( lowbit_store74_B ),
-                    .dout(sq_sum74_B[2:0]));
+//    srlvec #(.NBITS(13))
+//        u_sum74_dlyB(.clk(clk_i),
+//                     .ce(1'b1),
+//                     .a( { 3'b000, use_undelayed_B_store}),
+//                     .din( sum74_storeB ),
+//                     .dout(sq_sum74_B[15:3]));
+//    srlvec #(.NBITS(3))
+//        u_lb74_dlyB(.clk(clk_i),
+//                    .ce(1'b1),
+//                    .a( { 3'b001, use_undelayed_B_store }),
+//                    .din( lowbit_store74_B ),
+//                    .dout(sq_sum74_B[2:0]));
     
     // and now FINALLY we add it up in the two24
     wire [1:0][23:0] final_dsp_out;
