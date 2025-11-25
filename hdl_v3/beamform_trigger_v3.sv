@@ -37,6 +37,7 @@ import pueo_dummy_beams::*;
 module beamform_trigger_v3 #(parameter FULL = "TRUE",
                              parameter DEBUG = "FALSE",
                              parameter SKEWED_TOP = "FALSE",
+                             parameter USE_ALL_BEAMS = "FALSE",
                              localparam NBEAMS = (FULL == "TRUE") ? NUM_BEAM : NUM_DUMMY,
                              localparam NBITS=5,
                              localparam NSAMP=8,
@@ -273,19 +274,24 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
                 assign beam1 = {NSAMP*3*SB_BITS{1'b0}};
                 // Don't need to assign the trigger because its index doesn't exist.
             end
-            
-            dual_pueo_beam_v2 #(.INTYPE("POSTADD"),
-                                .DEBUG(DEBUG),
-                                .CASCADE(b == 0 ? "FALSE" : "TRUE"))
-                u_beamform(.clk_i(clk_i),
-                           .beamA_i(beam0),
-                           .beamB_i(beam1),
-                           .thresh_i(thresh_i),
-                           .thresh_wr_i(thresh_wr_i),
-                           .thresh_update_i(thresh_update_i),
-                           .trigger_o(trigger_out),
-                           .thresh_casc_i(cascade[b]),
-                           .thresh_casc_o(cascade[(b+2) % NBEAMS]));                                
+
+            if (top_index < NUM_TOP_ADDERS ||
+                USE_ALL_BEAMS == "TRUE") begin : RL
+                dual_pueo_beam_v2 #(.INTYPE("POSTADD"),
+                                    .DEBUG(DEBUG),
+                                    .CASCADE(b == 0 ? "FALSE" : "TRUE"))
+                    u_beamform(.clk_i(clk_i),
+                               .beamA_i(beam0),
+                               .beamB_i(beam1),
+                               .thresh_i(thresh_i),
+                               .thresh_wr_i(thresh_wr_i),
+                               .thresh_update_i(thresh_update_i),
+                               .trigger_o(trigger_out),
+                               .thresh_casc_i(cascade[b]),
+                               .thresh_casc_o(cascade[(b+2) % NBEAMS]));
+            end else begin : FK                               
+                assign trigger_out = 2'b00;
+            end
         end
     endgenerate
 
