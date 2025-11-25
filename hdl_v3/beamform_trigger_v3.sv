@@ -290,7 +290,7 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
                                .thresh_casc_i(cascade[b]),
                                .thresh_casc_o(cascade[(b+2) % NBEAMS]));
             end else begin : FK                               
-                assign trigger_out = 2'b00;
+                assign trigger_out = 4'h0;
             end
         end
     endgenerate
