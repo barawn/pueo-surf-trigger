@@ -91,9 +91,9 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
             (* CUSTOM_CC_DST = WBCLKTYPE *)
             reg wr_agc_wb = 0; 
         
-            // agc mask
+            // agc en
             (* CUSTOM_CC_SRC = WBCLKTYPE *)
-            reg agc_chan_mask = 0;
+            reg agc_chan_en = 1;
 
             assign wb_agc_module_dat_o = data_agc_o;
             assign wb_agc_module_adr_o = address_agc;
@@ -217,8 +217,8 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                     end
                     // If writing to a threshold, put it in the appropriate register
                     if (state == WRITE) begin
-                        if (`ADDR_MATCH(wb_agc_controller_adr_i, 0x18, 8'b00111100)) begin
-                            if agc_chan_mask <= wb_dat_i[0];         
+                        if (`ADDR_MATCH(wb_agc_controller_adr_i, 8'h18, 8'b00111100)) begin
+                            agc_chan_en <= wb_agc_controller_dat_i[0];         
                         end 
                     end
                 end
@@ -413,7 +413,7 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                                     agc_module_FSM_state <= AGC_MODULE_RESETTING;
                                     agc_module_info_reg[4] <= { {15{1'b0}},agc_recalculated_scale_reg};
                                     agc_module_info_reg[5] <= { {16{1'b0}},agc_recalculated_offset_reg};
-                                    agc_module_info_reg[6] <= { {31{1'b0}},agc_chan_mask};
+                                    agc_module_info_reg[6] <= { {31{1'b0}},agc_chan_en};
                                 end
                             end 
                         end
@@ -543,7 +543,7 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
         .wb_clk_i(wb_clk_i),
         .wb_rst_i(wb_rst_i),        
         `CONNECT_WBS_IFM( wb_ , wb_agc_module_ ),
-        .agc_chan_mask_i(agc_chan_mask)
+        .agc_chan_en_i(agc_chan_en),
         .aclk(aclk),
         .aresetn(!reset_i),
         .dat_i(to_agc),
