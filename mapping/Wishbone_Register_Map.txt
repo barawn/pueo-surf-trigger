@@ -41,7 +41,8 @@ Wishbone Address Space For L1 Trigger
             0x400C : Less-than accumulator.
             0x4010 : AGC scale.
             0x4014 : AGC offset.
-         0x4018 - 0x403F : UNUSED
+            0x4018 : AGC channel disable.
+         0x401C - 0x403F : UNUSED
          0x4040 - 0x4044 : Read AGC Servo Data.
             0x4040 : AGC scale adjustment delta per cycle.
             0x4044 : AGC offset adjustment delta per cycle.
