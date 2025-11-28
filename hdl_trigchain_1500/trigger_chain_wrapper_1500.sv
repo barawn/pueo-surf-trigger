@@ -186,7 +186,7 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                     response_reg <= 32'h0;
                     agc_control_scale_delta <= STARTING_SCALE_DELTA;
                     agc_control_offset_delta <= STARTING_OFFSET_DELTA;
-        //            agc_module_info_reg <= {(6*32){1'b0}};
+                    //            agc_module_info_reg <= {(6*32){1'b0}};
                     // Add any other registers you want to reset here
                 end else begin
                     // Determine what we are doing this cycle
@@ -353,9 +353,19 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
         
                             // OFFSET GT-LT
                             if(agc_module_info_reg[2] > (agc_module_info_reg[3] + OFFSET_ERR)) begin
-                                agc_recalculated_offset_reg = agc_module_info_reg[5] - agc_control_offset_delta;
+                                if($signed(agc_module_info_reg[5]) > -1000) begin // Cutoff
+                                    agc_recalculated_scale_reg = agc_module_info_reg[5] - agc_control_scale_delta;
+                                end else begin
+                                    agc_recalculated_scale_reg = agc_module_info_reg[5];
+                                end
+                                //agc_recalculated_offset_reg = agc_module_info_reg[5] - agc_control_offset_delta;
                             end else if(agc_module_info_reg[3] > (agc_module_info_reg[2] + OFFSET_ERR)) begin
-                                agc_recalculated_offset_reg = agc_module_info_reg[5] + agc_control_offset_delta;
+                                if($signed(agc_module_info_reg[5]) < 1000) begin // Cutoff
+                                    agc_recalculated_scale_reg = agc_module_info_reg[5] + agc_control_scale_delta;
+                                end else begin
+                                    agc_recalculated_scale_reg = agc_module_info_reg[5];
+                                end
+                                // agc_recalculated_offset_reg = agc_module_info_reg[5] + agc_control_offset_delta;
                             end
                             agc_module_FSM_state <= AGC_MODULE_WRITING;
         

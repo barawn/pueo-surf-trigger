@@ -10,6 +10,7 @@ module agc_wrapper #(parameter WBCLKTYPE = "PSCLK",
         input wb_rst_i,
                                                     // using [4:2] of address space (mask 0x1C)
         `TARGET_NAMED_PORTS_WB_IF( wb_ , 8, 32 ),  //address then data width
+        input agc_chan_mask_i,
         input aclk,
         input aresetn, // TODO: Unused?
         input [NBITS*NSAMP-1:0] dat_i,
@@ -35,6 +36,9 @@ module agc_wrapper #(parameter WBCLKTYPE = "PSCLK",
     // agc scale
     (* CUSTOM_CC_SRC = WBCLKTYPE *)
     reg [16:0] agc_scale = {17{1'b0}};
+
+    (* CUSTOM_CC_SRC = WBCLKTYPE *)
+    wire [AGCBITS*NSAMP-1:0] agc_out = {(AGCBITS*NSAMP-1:0){1'b0}};
     // offset. The offset needs to be way bigger than Q0.8.
     // Try Q8.8 first.
     (* CUSTOM_CC_SRC = WBCLKTYPE *)
@@ -170,13 +174,13 @@ module agc_wrapper #(parameter WBCLKTYPE = "PSCLK",
                         .count_i(agc_ce),
                         .tcount_reached_o(agc_time_done));
 
-
+    assign dat_o = agc_out & {(AGCBITS*NSAMP-1:0){agc_chan_mask}};
     //wire [39:0] agc_out;
     agc_core #(.CLKTYPE(CLKTYPE), .TIMESCALE_REDUCTION(TIMESCALE_REDUCTION),
                .NSAMP(NSAMP)) 
              u_agc0( .clk_i(aclk),
                      .rf_dat_i(dat_i),
-                     .rf_dat_o(dat_o),
+                     .rf_dat_o(agc_o),
                      .sq_accum_o(sq_accum_out),
                      .gt_accum_o(gt_accum_out),
                      .lt_accum_o(lt_accum_out),
@@ -184,7 +188,7 @@ module agc_wrapper #(parameter WBCLKTYPE = "PSCLK",
                      .agc_tick_i(agc_tick_aclk),
                      .agc_ce_i(agc_ce),
                      .agc_rst_i(agc_reset_aclk),
-                     .agc_scale_i( agc_scale ),
+                     .agc_scale_i( agc_scale_masked ),
                      .offset_i( agc_offset ),
                      .agc_scale_ce_i( agc_scale_load_aclk ),
                      .agc_offset_ce_i(agc_offset_load_aclk),

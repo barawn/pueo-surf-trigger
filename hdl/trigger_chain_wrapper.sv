@@ -67,8 +67,8 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
         end
     endfunction    
 
+    // pick off bits [4:2]
     `define ADDR_MATCH( addr, val, mask ) ( ( addr & mask ) == (val & mask) )
-    localparam [7:0] AGC_MASK = {8{1'b1}}; // May be unused
     // localparam NBITS_KP = 32;
     // localparam NFRAC_KP = 10;
 
@@ -91,6 +91,10 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
             (* CUSTOM_CC_DST = WBCLKTYPE *)
             reg wr_agc_wb = 0; 
         
+            // agc mask
+            (* CUSTOM_CC_SRC = WBCLKTYPE *)
+            reg agc_chan_mask = 0;
+
             assign wb_agc_module_dat_o = data_agc_o;
             assign wb_agc_module_adr_o = address_agc;
             assign wb_agc_module_cyc_o = use_agc_wb;
@@ -103,7 +107,7 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
             reg [31:0] response_reg = 32'h0; // Pass back AGC information
         
             (* CUSTOM_CC_DST = WBCLKTYPE *)
-            reg [5:0][31:0] agc_module_info_reg = {(6*32){1'b0}}; // Store of downstream AGC info
+            reg [6:0][31:0] agc_module_info_reg = {(7*32){1'b0}}; // Store of downstream AGC info
             wire[24:0] agc_sq_adjusted = {{(17-AGC_TIMESCALE_REDUCTION_BITS){1'd0}},{agc_module_info_reg[1][24:17-AGC_TIMESCALE_REDUCTION_BITS]}};
         
         
@@ -213,7 +217,9 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                     end
                     // If writing to a threshold, put it in the appropriate register
                     if (state == WRITE) begin
-                        // NO CURRENT NEED FOR WRITING, CAN IMPLEMENT LATER           
+                        if (`ADDR_MATCH(wb_agc_controller_adr_i, 0x18, 8'b00111100)) begin
+                            if agc_chan_mask <= wb_dat_i[0];         
+                        end 
                     end
                 end
             end
@@ -407,6 +413,7 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                                     agc_module_FSM_state <= AGC_MODULE_RESETTING;
                                     agc_module_info_reg[4] <= { {15{1'b0}},agc_recalculated_scale_reg};
                                     agc_module_info_reg[5] <= { {16{1'b0}},agc_recalculated_offset_reg};
+                                    agc_module_info_reg[6] <= { {31{1'b0}},agc_chan_mask};
                                 end
                             end 
                         end
@@ -536,6 +543,7 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
         .wb_clk_i(wb_clk_i),
         .wb_rst_i(wb_rst_i),        
         `CONNECT_WBS_IFM( wb_ , wb_agc_module_ ),
+        .agc_chan_mask_i(agc_chan_mask)
         .aclk(aclk),
         .aresetn(!reset_i),
         .dat_i(to_agc),
