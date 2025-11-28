@@ -355,9 +355,18 @@ module trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
         
                             // OFFSET GT-LT
                             if(agc_module_info_reg[2] > (agc_module_info_reg[3] + OFFSET_ERR)) begin
-                                agc_recalculated_offset_reg = agc_module_info_reg[5] - agc_control_offset_delta;
+                                if($signed(agc_module_info_reg[5]) > -1000) begin // Cutoff
+                                    agc_recalculated_scale_reg = agc_module_info_reg[5] - agc_control_scale_delta;
+                                end else begin
+                                    agc_recalculated_scale_reg = agc_module_info_reg[5];
+                                end
+                                //agc_recalculated_offset_reg = agc_module_info_reg[5] - agc_control_offset_delta;
                             end else if(agc_module_info_reg[3] > (agc_module_info_reg[2] + OFFSET_ERR)) begin
-                                agc_recalculated_offset_reg = agc_module_info_reg[5] + agc_control_offset_delta;
+                                if($signed(agc_module_info_reg[5]) < 1000) begin // Cutoff
+                                    agc_recalculated_scale_reg = agc_module_info_reg[5] + agc_control_scale_delta;
+                                end else begin
+                                    agc_recalculated_scale_reg = agc_module_info_reg[5];
+                                end
                             end
                             agc_module_FSM_state <= AGC_MODULE_WRITING;
         
