@@ -37,7 +37,7 @@ import pueo_dummy_beams::*;
 module beamform_trigger_v3 #(parameter FULL = "TRUE",
                              parameter DEBUG = "FALSE",
                              parameter SKEWED_TOP = "FALSE",
-                             parameter USE_ALL_BEAMS = "FALSE",
+                             parameter USE_ALL_BEAMS = "TRUE",
                              localparam NBEAMS = (FULL == "TRUE") ? NUM_BEAM : NUM_DUMMY,
                              localparam NBITS=5,
                              localparam NSAMP=8,
@@ -49,6 +49,8 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
         input [1:0] thresh_update_i,
         output [2*NBEAMS-1:0] trigger_o
     );
+    
+    localparam PIPE_BEAMS = "FALSE";
     
     localparam int LEFT_INDICES[0:2] = '{ 5, 6, 7 };
     localparam int RIGHT_INDICES[0:2] = '{ 1, 2, 3 };
@@ -106,7 +108,7 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
         for (l=0;l<NUM_LEFT_ADDERS;l=l+1) begin : LA
             if (NUM_LEFT_STORE > 1) begin : LS
                 sample_store #(.NBITS(SB_BITS),
-                               .PIPE("FALSE"),
+                               .PIPE(PIPE_BEAMS),
                                .NSAMP(8),
                                .SAMPLE_STORE_DEPTH(NUM_LEFT_STORE))
                                u_store(.clk_i(clk_i),
@@ -191,7 +193,7 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
                           .chB_i(top_doublet_inputs[t][1]),
                           .chC_i({NSAMP{sym_shift}}),
                           .dat_o(top_doublet_out));
-            assign top_doublets[t] = top_doublet_reg;
+            assign top_doublets[t] = (PIPE_BEAMS == "TRUE") ? top_doublet_reg : top_doublet_out;
         end
         // and now we build the beams
         for (b=0;b<NBEAMS;b=b+2) begin : BB
