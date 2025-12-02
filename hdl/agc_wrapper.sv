@@ -174,7 +174,9 @@ module agc_wrapper #(parameter WBCLKTYPE = "PSCLK",
                         .count_i(agc_ce),
                         .tcount_reached_o(agc_time_done));
 
-    assign dat_o = agc_out & {(AGCBITS*NSAMP-1){agc_chan_en_i}};
+    // zero = 5'b10000 since it's offset binary
+    assign dat_o = (agc_chan_en_i) ? agc_out : {NSAMP{5'b10000}};
+
     //wire [39:0] agc_out;
     agc_core #(.CLKTYPE(CLKTYPE), .TIMESCALE_REDUCTION(TIMESCALE_REDUCTION),
                .NSAMP(NSAMP)) 
