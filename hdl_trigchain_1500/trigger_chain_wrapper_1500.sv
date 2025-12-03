@@ -79,6 +79,8 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
     // WB interface to actual AGC module
     `DEFINE_WB_IF( wb_agc_module_ , 8, 32);
 
+    wire this_agc_en;
+
     generate
         if (AGC_CONTROL == "TRUE") begin : AGCC
         
@@ -98,6 +100,7 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
             // agc en
             (* CUSTOM_CC_SRC = WBCLKTYPE *)
             reg agc_chan_en = 1;
+            assign this_agc_en = agc_chan_en;
 
             assign wb_agc_module_dat_o = data_agc_o;
             assign wb_agc_module_adr_o = address_agc;
@@ -459,6 +462,8 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
             assign wb_agc_controller_dat_o = wb_agc_module_dat_i;
             assign wb_agc_controller_rty_o = wb_agc_module_rty_i;
             assign wb_agc_controller_err_o = wb_agc_module_err_i;            
+            
+            assign this_agc_en = 1'b1;
         end
     endgenerate
     // Raw output of the LPF. But we drop every other.
@@ -579,7 +584,7 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
         .wb_clk_i(wb_clk_i),
         .wb_rst_i(wb_rst_i),        
         `CONNECT_WBS_IFM( wb_ , wb_agc_module_ ),
-        .agc_chan_en_i(agc_chan_en),
+        .agc_chan_en_i(this_agc_en),
         .aclk(aclk),
         .aresetn(!reset_i),
         .dat_i(to_agc),
