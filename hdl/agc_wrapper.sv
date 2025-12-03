@@ -38,7 +38,7 @@ module agc_wrapper #(parameter WBCLKTYPE = "PSCLK",
     reg [16:0] agc_scale = {17{1'b0}};
 
     (* CUSTOM_CC_SRC = WBCLKTYPE *)
-    wire [AGCBITS*NSAMP-1:0] agc_out = {(AGCBITS*NSAMP-1){1'b0}};
+    wire [AGCBITS*NSAMP-1:0] agc_o;
     // offset. The offset needs to be way bigger than Q0.8.
     // Try Q8.8 first.
     (* CUSTOM_CC_SRC = WBCLKTYPE *)
@@ -175,7 +175,7 @@ module agc_wrapper #(parameter WBCLKTYPE = "PSCLK",
                         .tcount_reached_o(agc_time_done));
 
     // zero = 5'b10000 since it's offset binary
-    assign dat_o = (agc_chan_en_i) ? agc_out : {NSAMP{5'b10000}};
+    assign dat_o = (agc_chan_en_i) ? agc_o : {NSAMP{5'b10000}};
 
     //wire [39:0] agc_out;
     agc_core #(.CLKTYPE(CLKTYPE), .TIMESCALE_REDUCTION(TIMESCALE_REDUCTION),
