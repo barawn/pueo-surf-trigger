@@ -124,7 +124,7 @@ module agc_dsp #(parameter Q_SCALE = 12,
     wire patternbmatch;
     (* CUSTOM_CC_DST = CLKTYPE *)
     DSP48E2 #(.AREG(2),.BREG(2),`C_UNUSED_ATTRS,.DREG(1),.ADREG(PREADD_REGISTER),.MREG(1),
-              .IS_RSTP_INVERTED(1'b1),
+              .IS_RSTM_INVERTED(1'b1),
               .PREG(1),.USE_PATTERN_DETECT("PATDET"),
               .SEL_MASK("MASK"),
               .SEL_PATTERN("PATTERN"),
@@ -147,7 +147,7 @@ module agc_dsp #(parameter Q_SCALE = 12,
                     .CEM(1'b1),
                     .CEP(1'b1),
                     // this is inverted                    
-                    .RSTP(en_i),
+                    .RSTM(en_i),
                     
                     .INMODE(dsp_inmode),
                     .ALUMODE(dsp_alumode),
