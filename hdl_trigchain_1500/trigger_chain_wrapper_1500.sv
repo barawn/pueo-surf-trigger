@@ -104,11 +104,16 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
             (* CUSTOM_CC_DST = CLKTYPE, ASYNC_REG = "TRUE" *)
             reg [1:0] agc_chan_en_aclk = {2{1'b0}};
 
+            // pipes. replicate a bit.
+            (* MAX_FANOUT = 20 *)
+            reg [1:0] agc_chan_en_pipe = {2{1'b0}};
+
             always @(posedge aclk) begin : RR
                 agc_chan_en_aclk <= { agc_chan_en_aclk[0], agc_chan_en };
+                agc_chan_en_pipe <= { agc_chan_en_pipe[0], agc_chan_en_aclk[1] };
             end
 
-            assign this_agc_en = agc_chan_en_aclk[1];
+            assign this_agc_en = agc_chan_en_pipe[1];
 
             assign wb_agc_module_dat_o = data_agc_o;
             assign wb_agc_module_adr_o = address_agc;

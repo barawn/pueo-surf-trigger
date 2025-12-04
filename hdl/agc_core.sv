@@ -14,6 +14,7 @@ module agc_core #(parameter NBITS=12,
                   parameter TIMESCALE_REDUCTION=1,
                   parameter CLKTYPE="NONE")(
         input clk_i,
+        input en_i,
         // data inputs
         input [NBITS*NSAMP-1:0] rf_dat_i,
         // rescaled outputs
@@ -101,6 +102,7 @@ module agc_core #(parameter NBITS=12,
                            .ce_scale_i(agc_scale_ce_i),
                            .ce_offset_i(agc_offset_ce_i),
                            .apply_i(agc_apply_i),
+                           .en_i(en_i),
                            .out_o(rf_dat_o[OBITS*i +: OBITS]),
                            .abs_o(abs_vals[(OBITS-1)*i +: (OBITS-1)]),
                            .gt_o(gt_thresh[i]),

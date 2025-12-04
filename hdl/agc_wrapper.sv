@@ -175,12 +175,14 @@ module agc_wrapper #(parameter WBCLKTYPE = "PSCLK",
                         .tcount_reached_o(agc_time_done));
 
     // zero = 5'b10000 since it's offset binary
-    assign dat_o = (agc_chan_en_i) ? agc_o : {NSAMP{5'b10000}};
-
+    //assign dat_o = (agc_chan_en_i) ? agc_o : {NSAMP{5'b10000}};
+    assign dat_o = agc_o;
+    
     //wire [39:0] agc_out;
     agc_core #(.CLKTYPE(CLKTYPE), .TIMESCALE_REDUCTION(TIMESCALE_REDUCTION),
                .NSAMP(NSAMP)) 
              u_agc0( .clk_i(aclk),
+                     .en_i(agc_chan_en_i),
                      .rf_dat_i(dat_i),
                      .rf_dat_o(agc_o),
                      .sq_accum_o(sq_accum_out),

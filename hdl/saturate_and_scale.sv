@@ -27,6 +27,7 @@ module saturate_and_scale #(parameter LSB=4,
         input [47:0] in_i,
         input patternmatch_i,
         input patternbmatch_i,
+        input en_i,
         output [4:0] out_o,
         output [3:0] abs_o,
         output gt_o,
@@ -60,7 +61,10 @@ module saturate_and_scale #(parameter LSB=4,
 
             reg [4:0] rounded_rereg = 5'b10000;
             always @(posedge clk_i) begin : PL
-                rounded_rereg <= rounded_output;
+                if (en_i)
+                    rounded_rereg <= rounded_output;
+                else
+                    rounded_rereg <= 5'b10000;
                 sign_rereg <= in_i[47];
                 bounds_rereg <= (patternmatch_i || patternbmatch_i);
                 base_rereg <= in_i[LSB +: 4];

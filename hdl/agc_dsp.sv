@@ -50,6 +50,7 @@ module agc_dsp #(parameter Q_SCALE = 12,
                  parameter CLKTYPE = "NONE"
                  )(
         input clk_i,
+        input en_i,
         input [DAT_BITS-1:0] dat_i,
         input [16:0] scale_i,
         input [OFFSET_BITS-1:0] offset_i,
@@ -123,6 +124,7 @@ module agc_dsp #(parameter Q_SCALE = 12,
     wire patternbmatch;
     (* CUSTOM_CC_DST = CLKTYPE *)
     DSP48E2 #(.AREG(2),.BREG(2),`C_UNUSED_ATTRS,.DREG(1),.ADREG(PREADD_REGISTER),.MREG(1),
+              .IS_RSTP_INVERTED(1'b1),
               .PREG(1),.USE_PATTERN_DETECT("PATDET"),
               .SEL_MASK("MASK"),
               .SEL_PATTERN("PATTERN"),
@@ -144,6 +146,8 @@ module agc_dsp #(parameter Q_SCALE = 12,
                     .CEAD(1'b1),
                     .CEM(1'b1),
                     .CEP(1'b1),
+                    // this is inverted                    
+                    .RSTP(en_i),
                     
                     .INMODE(dsp_inmode),
                     .ALUMODE(dsp_alumode),
@@ -151,13 +155,14 @@ module agc_dsp #(parameter Q_SCALE = 12,
                     
                     .PATTERNDETECT(patternmatch),
                     .PATTERNBDETECT(patternbmatch),
-                    .P(dsp_p));              
+                    .P(dsp_p));
 
     saturate_and_scale #(.LSB(DESIRED_LSB))
         u_scale(.clk_i(clk_i),
                 .in_i(dsp_p),
                 .patternmatch_i(patternmatch),
                 .patternbmatch_i(patternbmatch),
+                .en_i(1'b1),
                 .out_o(out_o),
                 .abs_o(abs_o),
                 .gt_o(gt_o),
