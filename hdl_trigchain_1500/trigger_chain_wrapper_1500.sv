@@ -338,13 +338,13 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
         
                             // SCALE
                             if(agc_sq_adjusted > (TARGET_RMS_SQUARED + RMS_SQUARE_SCALE_ERR)) begin
-                                if(agc_module_info_reg[4] > 17'h0012C) begin // Cutoff
+                                if(agc_module_info_reg[4] > (17'h00040 + STARTING_SCALE_DELTA)) begin // Cutoff at 0.0009765625 (4096 -> 4)
                                     agc_recalculated_scale_reg = agc_module_info_reg[4] - agc_control_scale_delta;
                                 end else begin
                                     agc_recalculated_scale_reg = agc_module_info_reg[4];
                                 end
                             end else if(agc_sq_adjusted < (TARGET_RMS_SQUARED - RMS_SQUARE_SCALE_ERR)) begin
-                                if(agc_module_info_reg[4] < 17'h1FBD0) begin // Cutoff
+                                if(agc_module_info_reg[4] < (17'h4000-STARTING_SCALE_DELTA)) begin // Cutoff at 0.25
                                     agc_recalculated_scale_reg = agc_module_info_reg[4] + agc_control_scale_delta;
                                 end else begin
                                     agc_recalculated_scale_reg = agc_module_info_reg[4];
@@ -353,9 +353,18 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
         
                             // OFFSET GT-LT
                             if(agc_module_info_reg[2] > (agc_module_info_reg[3] + OFFSET_ERR)) begin
-                                agc_recalculated_offset_reg = agc_module_info_reg[5] - agc_control_offset_delta;
+                                if($signed(agc_module_info_reg[5]) > (-1000 + STARTING_OFFSET_DELTA)) begin // Cutoff
+                                    agc_recalculated_scale_reg = agc_module_info_reg[5] - agc_control_scale_delta;
+                                end else begin
+                                    agc_recalculated_scale_reg = agc_module_info_reg[5];
+                                end
+                                //agc_recalculated_offset_reg = agc_module_info_reg[5] - agc_control_offset_delta;
                             end else if(agc_module_info_reg[3] > (agc_module_info_reg[2] + OFFSET_ERR)) begin
-                                agc_recalculated_offset_reg = agc_module_info_reg[5] + agc_control_offset_delta;
+                                if($signed(agc_module_info_reg[5]) < (1000 - STARTING_OFFSET_DELTA)) begin // Cutoff
+                                    agc_recalculated_scale_reg = agc_module_info_reg[5] + agc_control_scale_delta;
+                                end else begin
+                                    agc_recalculated_scale_reg = agc_module_info_reg[5];
+                                end
                             end
                             agc_module_FSM_state <= AGC_MODULE_WRITING;
         
