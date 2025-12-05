@@ -257,7 +257,8 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
             localparam [AGC_MODULE_FSM_BITS-1:0] AGC_MODULE_LOADING = 6;
             localparam [AGC_MODULE_FSM_BITS-1:0] AGC_MODULE_APPLYING = 7;
             localparam [AGC_MODULE_FSM_BITS-1:0] AGC_MODULE_BOOT_DELAY = 8;
-        
+            localparam [AGC_MODULE_FSM_BITS-1:0] AGC_MODULE_NOT_ENABLED = 9;
+            
             localparam COMM_FSM_BITS = 2;
             localparam [COMM_FSM_BITS-1:0] COMM_SENDING = 0;
             localparam [COMM_FSM_BITS-1:0] COMM_WAITING = 1;
@@ -366,7 +367,7 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                                     agc_recalculated_scale_reg = agc_module_info_reg[4];
                                 end
                             end else if(agc_sq_adjusted < (TARGET_RMS_SQUARED - RMS_SQUARE_SCALE_ERR)) begin
-                                if(agc_module_info_reg[4] < 17'h1FBD0) begin // Cutoff
+                                if(agc_module_info_reg[4] < 17'h04000) begin // Cutoff
                                     agc_recalculated_scale_reg = agc_module_info_reg[4] + agc_control_scale_delta;
                                 end else begin
                                     agc_recalculated_scale_reg = agc_module_info_reg[4];
@@ -430,13 +431,17 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                                 if(wb_agc_module_ack_i) begin // Command received, move on
                                     finish_write_cycle_agc();
                                     comm_FSM_state <= COMM_SENDING;
-                                    agc_module_FSM_state <= AGC_MODULE_RESETTING;
+                                    
+                                    if (!agc_chan_en) agc_module_FSM_state <= AGC_MODULE_NOT_ENABLED;
+                                    else agc_module_FSM_state <= AGC_MODULE_RESETTING;
+                                    
                                     agc_module_info_reg[4] <= { {15{1'b0}},agc_recalculated_scale_reg};
                                     agc_module_info_reg[5] <= { {16{1'b0}},agc_recalculated_offset_reg};
                                     agc_module_info_reg[6] <= { {31{1'b0}},agc_chan_en};
                                 end
                             end 
                         end
+                        AGC_MODULE_NOT_ENABLED: if (agc_chan_en) agc_module_FSM_state <= AGC_MODULE_RESETTING;
                         default:begin // Boot delay 8
                             if(boot_delay_count > 0) boot_delay_count <= boot_delay_count-1;
                             else agc_module_FSM_state <= AGC_MODULE_WRITING;
