@@ -573,8 +573,12 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
                 u_bq(`CONNECT_WBS_IFS( wb_ , wb_bq_ ));
             // TODO replace this with the delay that you would normally
             // get from a biquad with unity gain
-            assign biquad_out = pipe_to_biquad;
+//            assign biquad_out = pipe_to_biquad;
 
+            half_notch4 #(.NBITS(12))
+                u_notch(.clk_i(aclk),
+                        .dat_i(pipe_to_biquad),
+                        .dat_o(biquad_out));
 
             upsample_wrap #(.FILTER_VERSION(HDL_FILTER_VERSION == "V4" ? 4 : 3))
                           u_upsample(.clk_i(aclk),
