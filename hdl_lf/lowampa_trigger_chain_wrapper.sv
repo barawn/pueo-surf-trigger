@@ -52,6 +52,8 @@ module lowampa_trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS =
     // localparam NBITS_KP = 32;
     // localparam NFRAC_KP = 10;
 
+    wire this_agc_en;
+
     generate
         if (AGC_CONTROL == "TRUE") begin : AGCC
         
@@ -67,6 +69,24 @@ module lowampa_trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS =
             
             (* CUSTOM_CC_DST = WBCLKTYPE *)
             reg wr_agc_wb = 0; 
+            
+            // agc en
+            (* CUSTOM_CC_SRC = WBCLKTYPE *)
+            reg agc_chan_en = 1;
+
+            (* CUSTOM_CC_DST = CLKTYPE, ASYNC_REG = "TRUE" *)
+            reg [1:0] agc_chan_en_aclk = {2{1'b0}};
+
+            // pipes. replicate a bit
+            (* MAX_FANOUT = 20 *)
+            reg [1:0] agc_chan_en_pipe = {2{1'b0}};
+        
+            always @(posedge aclk) begin : RR
+                agc_chan_en_aclk <= { agc_chan_en_aclk[0], agc_chan_en };
+                agc_chan_en_pipe <= { agc_chan_en_pipe[0], agc_chan_en_aclk[1] };
+            end
+        
+            assign this_agc_en = agc_chan_en_pipe[1];
         
             assign wb_agc_module_dat_o = data_agc_o;
             assign wb_agc_module_adr_o = address_agc;
@@ -208,6 +228,7 @@ module lowampa_trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS =
             localparam [AGC_MODULE_FSM_BITS-1:0] AGC_MODULE_LOADING = 6;
             localparam [AGC_MODULE_FSM_BITS-1:0] AGC_MODULE_APPLYING = 7;
             localparam [AGC_MODULE_FSM_BITS-1:0] AGC_MODULE_BOOT_DELAY = 8;
+            localparam [AGC_MODULE_FSM_BITS-1:0] AGC_MODULE_NOT_ENABLED = 9;
         
             localparam COMM_FSM_BITS = 2;
             localparam [COMM_FSM_BITS-1:0] COMM_SENDING = 0;
@@ -381,12 +402,16 @@ module lowampa_trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS =
                                 if(wb_agc_module_ack_i) begin // Command received, move on
                                     finish_write_cycle_agc();
                                     comm_FSM_state <= COMM_SENDING;
-                                    agc_module_FSM_state <= AGC_MODULE_RESETTING;
+                                    
+                                    if (!agc_chan_en) agc_module_FSM_state <= AGC_MODULE_NOT_ENABLED;
+                                    else agc_module_FSM_state <= AGC_MODULE_RESETTING;
+
                                     agc_module_info_reg[4] <= { {15{1'b0}},agc_recalculated_scale_reg};
                                     agc_module_info_reg[5] <= { {16{1'b0}},agc_recalculated_offset_reg};
                                 end
                             end 
                         end
+                        AGC_MODULE_NOT_ENABLED: if (agc_chan_en) agc_module_FSM_state <= AGC_MODULE_RESETTING;
                         default:begin // Boot delay 8
                             if(boot_delay_count > 0) boot_delay_count <= boot_delay_count-1;
                             else agc_module_FSM_state <= AGC_MODULE_WRITING;
@@ -497,6 +522,7 @@ module lowampa_trigger_chain_wrapper #( parameter AGC_TIMESCALE_REDUCTION_BITS =
         .wb_clk_i(wb_clk_i),
         .wb_rst_i(wb_rst_i),        
         `CONNECT_WBS_IFM( wb_ , wb_agc_module_ ),
+        .agc_chan_en_i(this_agc_en),
         .aclk(aclk),
         .aresetn(reset_i),
         .dat_i(to_agc),
