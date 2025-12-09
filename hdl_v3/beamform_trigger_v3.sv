@@ -145,7 +145,7 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
                 sample_store #(.NBITS(SB_BITS),
                                .PIPE(PIPE_BEAMS),
                                .NSAMP(8),
-                               .SAMPLE_STORE_DEPTH(NUM_LEFT_STORE))
+                               .SAMPLE_STORE_DEPTH(NUM_RIGHT_STORE))
                                u_store(.clk_i(clk_i),                               
                                        .dat_i(right_triplets[r]),
                                        .store_o(right_store[r]));
