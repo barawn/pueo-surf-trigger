@@ -1,7 +1,7 @@
 `timescale 1ns / 1ps
 `include "pueo_beams_09_04_25.sv"
+`include "pueo_lf_meta.sv"
 `include "pueo_dummy_beams.sv"
-
 import pueo_beams::NUM_BEAM;
 import pueo_dummy_beams::NUM_DUMMY;
 
@@ -15,7 +15,17 @@ import pueo_beams::META5_INDICES;
 import pueo_beams::META6_INDICES;
 import pueo_beams::META7_INDICES;
 
+import pueo_lf_meta::LF_META0_INDICES;
+import pueo_lf_meta::LF_META1_INDICES;
+import pueo_lf_meta::LF_META2_INDICES;
+import pueo_lf_meta::LF_META3_INDICES;
+import pueo_lf_meta::LF_META4_INDICES;
+import pueo_lf_meta::LF_META5_INDICES;
+import pueo_lf_meta::LF_META6_INDICES;
+import pueo_lf_meta::LF_META7_INDICES;
+
 module beam_meta_builder #(parameter FULL = "TRUE",
+                           parameter USE_LF = "FALSE",
                            parameter USE_V3 = "TRUE",
                            localparam NBEAMS = (FULL == "TRUE") ? NUM_BEAM : NUM_DUMMY)(
         input clk_i,
@@ -46,32 +56,62 @@ module beam_meta_builder #(parameter FULL = "TRUE",
             end
             assign trig_o = trig_rereg[1];
             if (FULL == "TRUE") begin : META
-                localparam int indices[0:7][0:21] =  { META0_INDICES,
-                                                       META1_INDICES,
-                                                       META2_INDICES,
-                                                       META3_INDICES,
-                                                       META4_INDICES,
-                                                       META5_INDICES,
-                                                       META6_INDICES,
-                                                       META7_INDICES };
-                for (n=0;n<2;n=n+1) begin : NYB
-                    wire [3:0][21:0] in_bits;
-                    for (b=0;b<4;b=b+1) begin : BL                    
-                        for (idx=0;idx<22;idx=idx+1) begin : IL
-                            localparam int this_beam = indices[4*n+b][idx];
-                            if (this_beam < NBEAMS) begin : RL
-                                assign in_bits[b][idx] = beam_i[this_beam];
-                            end else begin : FK
-                                assign in_bits[b][idx] = 1'b0;
+                if (USE_LF == "TRUE") begin : LF
+                    localparam int indices[0:7][0:21] =  { LF_META0_INDICES,
+                                                           LF_META1_INDICES,
+                                                           LF_META2_INDICES,
+                                                           LF_META3_INDICES,
+                                                           LF_META4_INDICES,
+                                                           LF_META5_INDICES,
+                                                           LF_META6_INDICES,
+                                                           LF_META7_INDICES };
+                    for (n=0;n<2;n=n+1) begin : NYB
+                        wire [3:0][21:0] in_bits;
+                        for (b=0;b<4;b=b+1) begin : BL                    
+                            for (idx=0;idx<22;idx=idx+1) begin : IL
+                                localparam int this_beam = indices[4*n+b][idx];
+                                if (this_beam < NBEAMS) begin : RL
+                                    assign in_bits[b][idx] = beam_i[this_beam];
+                                end else begin : FK
+                                    assign in_bits[b][idx] = 1'b0;
+                                end
                             end
                         end
+                        beam_meta_nybble u_nyb(.clk_i(clk_i),
+                                               .bit0_i(in_bits[0]),
+                                               .bit1_i(in_bits[1]),
+                                               .bit2_i(in_bits[2]),
+                                               .bit3_i(in_bits[3]),
+                                               .meta_o(meta_o[4*n +: 4]));
                     end
-                    beam_meta_nybble u_nyb(.clk_i(clk_i),
-                                           .bit0_i(in_bits[0]),
-                                           .bit1_i(in_bits[1]),
-                                           .bit2_i(in_bits[2]),
-                                           .bit3_i(in_bits[3]),
-                                           .meta_o(meta_o[4*n +: 4]));
+                end else begin : MIE
+                    localparam int indices[0:7][0:21] =  { META0_INDICES,
+                                                           META1_INDICES,
+                                                           META2_INDICES,
+                                                           META3_INDICES,
+                                                           META4_INDICES,
+                                                           META5_INDICES,
+                                                           META6_INDICES,
+                                                           META7_INDICES };
+                    for (n=0;n<2;n=n+1) begin : NYB
+                        wire [3:0][21:0] in_bits;
+                        for (b=0;b<4;b=b+1) begin : BL                    
+                            for (idx=0;idx<22;idx=idx+1) begin : IL
+                                localparam int this_beam = indices[4*n+b][idx];
+                                if (this_beam < NBEAMS) begin : RL
+                                    assign in_bits[b][idx] = beam_i[this_beam];
+                                end else begin : FK
+                                    assign in_bits[b][idx] = 1'b0;
+                                end
+                            end
+                        end
+                        beam_meta_nybble u_nyb(.clk_i(clk_i),
+                                               .bit0_i(in_bits[0]),
+                                               .bit1_i(in_bits[1]),
+                                               .bit2_i(in_bits[2]),
+                                               .bit3_i(in_bits[3]),
+                                               .meta_o(meta_o[4*n +: 4]));
+                    end
                 end
             end else begin
                 // Fake beams just get 0xFF for their meta.
