@@ -50,6 +50,9 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
         output [2*NBEAMS-1:0] trigger_o
     );
     
+    // If this is TRUE, insert a pipeline stage in all
+    // of the sub-beams. This switches on PIPE for the sample_store
+    // for the left/right beams and registers the top adders
     localparam PIPE_BEAMS = "FALSE";
     
     localparam int LEFT_INDICES[0:2] = '{ 5, 6, 7 };
@@ -140,7 +143,7 @@ module beamform_trigger_v3 #(parameter FULL = "TRUE",
         for (r=0;r<NUM_RIGHT_ADDERS;r=r+1) begin : RA
             if (NUM_RIGHT_STORE > 1) begin : RS
                 sample_store #(.NBITS(SB_BITS),
-                               .PIPE("TRUE"),
+                               .PIPE(PIPE_BEAMS),
                                .NSAMP(8),
                                .SAMPLE_STORE_DEPTH(NUM_LEFT_STORE))
                                u_store(.clk_i(clk_i),                               
