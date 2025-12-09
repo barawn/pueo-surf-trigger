@@ -3,6 +3,7 @@
 module generator_wrap #(parameter WBCLKTYPE = "NONE",
                         parameter IFCLKTYPE = "NONE",
                         parameter USE_V3 = "FALSE",
+                        parameter USE_LF = "FALSE",
                         parameter NBEAMS = 46)(
         input wb_clk_i,
         `TARGET_NAMED_PORTS_WB_IF( wb_ , 13, 32 ),
@@ -40,6 +41,7 @@ module generator_wrap #(parameter WBCLKTYPE = "NONE",
     // the v2 with its parameter.
     surf_trig_gen_v3 #(.NBEAMS(NBEAMS),
                        .USE_V3(USE_V3),
+                       .USE_LF(USE_LF),
                        .IFCLKTYPE(IFCLKTYPE),
                        .TRIG_CLOCKDOMAIN("IFCLK"))
         u_triggen(.ifclk(ifclk),

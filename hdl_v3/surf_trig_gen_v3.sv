@@ -26,6 +26,7 @@
 // The v3 code adds metadata generation.
 // USE_V3 is passed to the metadata generation module.
 module surf_trig_gen_v3 #(parameter NBEAMS=48,
+                          parameter USE_LF = "FALSE",
                           parameter USE_V3 = "FALSE",
                           parameter ACLKTYPE = "NONE",
                           parameter IFCLKTYPE = "NONE",
@@ -191,6 +192,7 @@ module surf_trig_gen_v3 #(parameter NBEAMS=48,
     reg [7:0] trig_meta = {8{1'b0}};
 
     beam_meta_builder #(.USE_V3(USE_V3),
+                        .USE_LF(USE_LF),
                         .FULL(NBEAMS == 2 ? "FALSE" : "TRUE"))
         u_meta(.clk_i(ifclk),
                .beam_i(triggered_beams_rereg),

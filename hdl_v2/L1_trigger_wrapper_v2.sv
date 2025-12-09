@@ -167,9 +167,11 @@ module L1_trigger_wrapper_v2 #(parameter NBEAMS=2,
     // We also now pass USE_V3 as an option, which gets passed down to
     // the trigger generator and determines whether or not the beam metadata
     // is built.
+    localparam GENERATOR_V3 = (TRIGGER_TYPE == "LFH" || TRIGGER_TYPE == "LFV") ? "TRUE" : USE_V3;
     generator_wrap #(.WBCLKTYPE(WBCLKTYPE),
                      .IFCLKTYPE(IFCLKTYPE),
-                     .USE_V3(USE_V3),
+                     .USE_V3(GENERATOR_V3),
+                     .USE_LF((TRIGGER_TYPE == "LFH" || TRIGGER_TYPE == "LFV") ? "TRUE" : "FALSE"),
                      .NBEAMS(NBEAMS))
         u_generator( .wb_clk_i(wb_clk_i),
                      `CONNECT_WBS_IFM( wb_ , generator_ ),
