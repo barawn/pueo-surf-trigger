@@ -5,6 +5,7 @@
 // TODO Make Fixed point parameterizable
 module biquad8_x2_wrapper #(parameter WBCLKTYPE="NONE",
                             parameter CLKTYPE="NONE",
+                            parameter BOTH_BIQUADS="TRUE",
                             parameter NSAMP=8,
                             parameter VERSION=2)(
         input wb_clk_i,
@@ -53,16 +54,17 @@ module biquad8_x2_wrapper #(parameter WBCLKTYPE="NONE",
     assign wb_dat_o = (wb_adr_i[7]) ? bq1_dat_i : bq0_dat_i;
     
     assign bq0_cyc_o = wb_cyc_i && !wb_adr_i[7];
-    assign bq1_cyc_o = wb_cyc_i && wb_adr_i[7];
     assign bq0_stb_o = wb_stb_i;
-    assign bq1_stb_o = wb_stb_i;
     assign bq0_adr_o = wb_adr_i[6:0];
-    assign bq1_adr_o = wb_adr_i[6:0];
     assign bq0_dat_o = wb_dat_i;
-    assign bq1_dat_o = wb_dat_i;
     assign bq0_we_o = wb_we_i;
-    assign bq1_we_o = wb_we_i;
     assign bq0_sel_o = wb_sel_i;
+
+    assign bq1_cyc_o = wb_cyc_i && wb_adr_i[7];
+    assign bq1_stb_o = wb_stb_i;
+    assign bq1_adr_o = wb_adr_i[6:0];
+    assign bq1_dat_o = wb_dat_i;
+    assign bq1_we_o = wb_we_i;
     assign bq1_sel_o = wb_sel_i;
     
 
@@ -106,24 +108,30 @@ module biquad8_x2_wrapper #(parameter WBCLKTYPE="NONE",
                           .notch_byp_i(notch0_byp_i),
                           .dat_i(dat_i),
                           .dat_o(bq_out[0]));   
-        
-            biquad8_wrapper_v2 #(.NBITS(16),
-                              .NFRAC(2),
-                              .NSAMP(NSAMP),
-                              .OUTBITS(16),
-                              .OUTFRAC(2),
-                              .WBCLKTYPE(WBCLKTYPE),
-                              .CLKTYPE(CLKTYPE))
-                u_biquad8_B(.wb_clk_i(wb_clk_i),
-                          .wb_rst_i(1'b0),
-                          `CONNECT_WBS_IFM( wb_ , bq1_ ),
-                          .clk_i(aclk),
-                          .rst_i(reset_BQ_i),
-                          .global_update_i(1'b0),
-                          .notch_update_i(notch_update_i),
-                          .notch_byp_i(notch1_byp_i),
-                          .dat_i(bq_out[0]),
-                          .dat_o(bq_out[1]));   
+            if (BOTH_BIQUADS == "TRUE") begin : BQ2        
+                biquad8_wrapper_v2 #(.NBITS(16),
+                                  .NFRAC(2),
+                                  .NSAMP(NSAMP),
+                                  .OUTBITS(16),
+                                  .OUTFRAC(2),
+                                  .WBCLKTYPE(WBCLKTYPE),
+                                  .CLKTYPE(CLKTYPE))
+                    u_biquad8_B(.wb_clk_i(wb_clk_i),
+                              .wb_rst_i(1'b0),
+                              `CONNECT_WBS_IFM( wb_ , bq1_ ),
+                              .clk_i(aclk),
+                              .rst_i(reset_BQ_i),
+                              .global_update_i(1'b0),
+                              .notch_update_i(notch_update_i),
+                              .notch_byp_i(notch1_byp_i),
+                              .dat_i(bq_out[0]),
+                              .dat_o(bq_out[1]));   
+            end else begin : BQ1
+                wbs_dummy #(.ADDRESS_WIDTH(8),.DATA_WIDTH(32))
+                    u_bq(`CONNECT_WBS_IFS( wb_ , wb_bq_ ));
+                            
+                assign bq_out[1] = bq_out[0];
+            end
         end else begin : V1
             // just don't freaking use this crap
             biquad8_wrapper #(.NBITS(12),

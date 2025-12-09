@@ -538,7 +538,7 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
 
     // Biquads
     generate
-        if (USE_BIQUADS == "TRUE") begin : BQ2
+        if (USE_BIQUADS == "TRUE" || USE_BIQUADS == "SINGLE") begin : BQ2
             reg [95:0] pipe_to_agc = {96{1'b0}};
             assign to_agc = pipe_to_agc;
 //            assign to_agc = upsample_out;
@@ -549,6 +549,7 @@ module trigger_chain_wrapper_1500 #( parameter AGC_TIMESCALE_REDUCTION_BITS = 4,
 //                pipe_to_upsample <= biquad_out;
 //            end
             biquad8_x2_wrapper #(.WBCLKTYPE(WBCLKTYPE),
+                                 .BOTH_BIQUADS(USE_BIQUADS != "SINGLE" ? "TRUE" : "FALSE"),
                                  .CLKTYPE(CLKTYPE),
                                  .NSAMP(4)) u_biquadx2(
                 .wb_clk_i(wb_clk_i),
